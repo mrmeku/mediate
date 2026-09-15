@@ -1,0 +1,155 @@
+defmodule Example.Infrastructure.Ocsf do
+  @moduledoc false
+  # Hidden, because the format a security log takes is the consumer's and
+  # not this package's surface. What is here is the mapping from the
+  # library's three events to OCSF records, against schema version 1.3.0.
+  # `docs/events.md` §6 has the table.
+  #
+  # The library carries what an event means, and this module carries the
+  # format. The
+  # class, category, severity, and type identifiers, the product metadata,
+  # and the shape of the actor are the consumer's. Each depends on the
+  # schema version, and the identifiers move between versions.
+
+  @version "1.3.0"
+  @product %{name: "Example", vendor_name: "Mediate"}
+
+  @classes %{
+    user: {3, 3001, "Account Change"},
+    group: {3, 3006, "Group Management"},
+    role: {3, 3005, "User Access Management"},
+    entity: {3, 3004, "Entity Management"}
+  }
+
+  @operations %{create: {1, "Create"}, update: {3, "Update"}, delete: {4, "Delete"}}
+  @asked %{create: {1, "Create"}, read: {2, "Read"}, update: {3, "Update"}, delete: {4, "Delete"}}
+  @other {99, "Other"}
+  @api {6, 6003, "API Activity"}
+  @datastore {6, 6005, "Datastore Activity"}
+  @activities %{read: {1, "Read"}, query: {4, "Query"}}
+
+  @users %{user: {1, "User"}, privileged: {2, "Admin"}, non_person_entity: {3, "System"}}
+  @unknown_user {0, "Unknown"}
+
+  @doc "The schema version this mapping targets."
+  @spec version() :: String.t()
+  def version, do: @version
+
+  @doc "A change event as the record of a managed entity that changed."
+  @spec change(map()) :: map()
+  def change(payload) when is_map(payload) do
+    {category, class, name} = Map.fetch!(@classes, payload.kind)
+    {activity, activity_name} = Map.fetch!(@operations, payload.operation)
+
+    %{
+      category_uid: category,
+      class_uid: class,
+      class_name: name,
+      activity_id: activity,
+      activity_name: activity_name,
+      type_uid: class * 100 + activity,
+      severity_id: 1,
+      time: payload.time,
+      actor: actor(payload.actor, payload.actor_kind),
+      entity: reference(payload.target),
+      metadata: metadata(payload.operation_id),
+      unmapped: %{changes: changes(payload.changes), schema: inspect(payload.schema)}
+    }
+  end
+
+  @doc "A decision event as the record of an API activity, with its duration in microseconds."
+  @spec decision(map(), non_neg_integer()) :: map()
+  def decision(said, duration) when is_map(said) and is_integer(duration) do
+    {category, class, name} = @api
+    {activity, activity_name} = Map.get(@asked, said.operation, @other)
+
+    record = %{
+      category_uid: category,
+      class_uid: class,
+      class_name: name,
+      activity_id: activity,
+      activity_name: activity_name,
+      type_uid: class * 100 + activity,
+      time: said.time,
+      duration: duration,
+      actor: actor(said.subject, said.subject_kind),
+      resource: reference(said.object),
+      api: %{operation: Atom.to_string(said.operation), response: %{message: text(said.reason)}},
+      metadata: metadata(said.operation_id),
+      unmapped: asked(said)
+    }
+
+    Map.merge(record, outcome(said.verdict))
+  end
+
+  @doc "An access event as the record of a datastore activity: a read or a query of the object type's table."
+  @spec access(map()) :: map()
+  def access(payload) when is_map(payload) do
+    {category, class, name} = @datastore
+    {activity, activity_name} = Map.fetch!(@activities, payload.activity)
+
+    %{
+      category_uid: category,
+      class_uid: class,
+      class_name: name,
+      activity_id: activity,
+      activity_name: activity_name,
+      type_uid: class * 100 + activity,
+      status_id: 1,
+      status: "Success",
+      severity_id: 1,
+      time: payload.time,
+      actor: actor(payload.subject, payload.subject_kind),
+      database: %{name: inspect(payload.repo)},
+      table: %{name: text(payload.object_type)},
+      metadata: metadata(payload.operation_id),
+      unmapped: %{ids: Enum.map(payload.ids, &identifier/1), count: payload.count, decision_id: payload.decision_id}
+    }
+  end
+
+  # A verdict is a status and a severity, which is what a security log
+  # sorts and alerts on. A scope answers a rule and not a yes or a no. It
+  # refuses nothing, so the record says success.
+  defp outcome(:allow), do: %{status_id: 1, status: "Success", severity_id: 1}
+  defp outcome(:scoped), do: %{status_id: 1, status: "Success", severity_id: 1}
+  defp outcome(:deny), do: %{status_id: 2, status: "Failure", severity_id: 2}
+
+  # What OCSF names no field for: which decider answered, under which
+  # version of its rules, from which facts, and what it raised.
+  defp asked(said) do
+    %{
+      decider: inspect(said.decider),
+      policy_version: said.version,
+      env: said.env,
+      exception: exception(said.exception)
+    }
+  end
+
+  defp metadata(operation_id) do
+    %{version: @version, product: @product, correlation_uid: operation_id}
+  end
+
+  defp actor({_kind, id}, kind) do
+    {type, type_name} = Map.get(@users, kind, @unknown_user)
+
+    %{user: %{uid: identifier(id), type_id: type, type: type_name}}
+  end
+
+  # A `scope` call answers about a query and not a row. The query is a rule
+  # over attribute values, which no record of this example carries.
+  defp reference({type, id}) when is_atom(type), do: %{type: text(type), uid: identifier(id)}
+  defp reference(_query), do: %{type: "query", uid: nil}
+
+  defp changes(changes) do
+    Map.new(changes, fn {field, {old, new}} -> {field, %{before: old, after: new}} end)
+  end
+
+  defp exception(nil), do: nil
+  defp exception(exception), do: inspect(exception.__struct__)
+
+  defp text(nil), do: nil
+  defp text(atom), do: Atom.to_string(atom)
+
+  defp identifier(nil), do: nil
+  defp identifier(id), do: to_string(id)
+end

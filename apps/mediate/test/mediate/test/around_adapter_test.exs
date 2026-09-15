@@ -1,0 +1,24 @@
+defmodule Mediate.Test.AroundAdapterTest do
+  use ExUnit.Case, async: true
+
+  alias Mediate.Test.AroundAdapter
+  alias Mediate.Test.Fake
+
+  @subject {:user, "11111111-1111-1111-1111-111111111111"}
+  @object {:thing, "22222222-2222-2222-2222-222222222222"}
+  @environment %{now: ~U[2026-09-08 00:00:00Z]}
+
+  test "every callback but around_query answers as the fake adapter does" do
+    assert AroundAdapter.options_schema() == Fake.options_schema()
+    assert AroundAdapter.scope_cap() == Fake.scope_cap()
+    args = [@subject, :read, @object, @environment, [verdict: :allow]]
+    assert apply(AroundAdapter, :decide, args) == apply(Fake, :decide, args)
+    scope_args = [@subject, :read, :thing, @environment, []]
+    assert apply(AroundAdapter, :scope, scope_args) == apply(Fake, :scope, scope_args)
+  end
+
+  test "around_query sends the query and the decision to the caller, then runs the call" do
+    assert :ran = AroundAdapter.around_query(:the_query, :the_decision, fn -> :ran end)
+    assert_received {:around_query, :the_query, :the_decision}
+  end
+end

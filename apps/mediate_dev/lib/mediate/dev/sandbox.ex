@@ -1,0 +1,23 @@
+defmodule Mediate.Dev.Sandbox do
+  @moduledoc """
+  Checks out a sandbox connection for the test process and shares it with
+  the processes the test spawns. So a test that writes sees its own rows and
+  no other test's. A test tagged `:committed` gets no sandbox. It runs real
+  commits on the committed database.
+  """
+
+  use Boundary, top_level?: true, deps: [Ecto.Adapters.SQL]
+
+  alias Ecto.Adapters.SQL.Sandbox
+
+  @doc "Call from `setup`. Returns `:ok`."
+  @spec setup(module(), map()) :: :ok
+  def setup(repo, tags) when is_atom(repo) and is_map(tags) do
+    if tags[:committed] do
+      :ok
+    else
+      pid = Sandbox.start_owner!(repo, shared: not tags[:async])
+      ExUnit.Callbacks.on_exit(fn -> Sandbox.stop_owner(pid) end)
+    end
+  end
+end

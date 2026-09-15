@@ -1,0 +1,112 @@
+defmodule Mediate.Cerbos.CoverageTest do
+  use ExUnit.Case, async: true
+
+  import Ecto.Query, only: [from: 2, subquery: 1, union_all: 2]
+
+  alias Mediate.Cerbos.Binding
+  alias Mediate.Cerbos.Conformance.Attributes
+  alias Mediate.Cerbos.Coverage
+  alias Mediate.Cerbos.Infrastructure.Decide
+  alias Mediate.Dev
+  alias Mediate.Dev.Sandbox
+  alias Mediate.Fixture.Folder
+  alias Mediate.Fixture.Item
+  alias Mediate.Fixture.Membership
+  alias Mediate.Fixture.World
+  alias Mediate.Test
+  alias Mediate.TestRepos.Sandboxed
+
+  setup tags do
+    sidecar = Dev.Cerbos.info()
+    :ok = Sandbox.setup(Sandboxed, tags)
+    :ok = Test.with_config(adapter: {Mediate.Cerbos, address: sidecar.address})
+
+    :ok =
+      Binding.override(repo: Sandboxed, attributes: Attributes, policies: sidecar.policies, commit: "conformance")
+
+    world = %World{
+      accounts: %{"ann" => World.cleared()},
+      folders: [1],
+      items: %{10 => 1},
+      memberships: %{{"ann", 1} => World.held(:reader)}
+    }
+
+    :ok = World.insert(Sandboxed, world)
+    {:ok, binding} = Binding.resolve()
+
+    {:ok, binding: binding, address: sidecar.address, ann: {:user, "ann"}, request: %{now: DateTime.utc_now()}}
+  end
+
+  test "the query the sidecar's own plan compiles to reads declared facts alone", ctx do
+    assert {:ok, {folders, _answer}} = Decide.scoped(ctx.binding, ctx.address, ctx.ann, :read, :folder, ctx.request)
+    assert Coverage.check(Attributes, from(f in Folder, where: ^folders)) == :ok
+
+    assert {:ok, {items, _answer}} = Decide.scoped(ctx.binding, ctx.address, ctx.ann, :edit, :item, ctx.request)
+    assert Coverage.check!(Attributes, from(i in Item, where: ^items)) == :ok
+  end
+
+  test "a column no declaration covers is a finding naming the schema" do
+    assert Coverage.check(Attributes, from(f in Folder, where: f.name == "folder 1")) == {:error, [{Folder, :name}]}
+
+    assert_raise ArgumentError, ~r/name of Mediate.Fixture.Folder/, fn ->
+      Coverage.check!(Attributes, from(f in Folder, where: f.name == "folder 1"))
+    end
+  end
+
+  test "a fragment cannot be walked, so it is a finding" do
+    query = from(f in Folder, where: fragment("? = 'folder 1'", f.name))
+
+    assert Coverage.check(Attributes, query) == {:error, [{:fragment, "? = 'folder 1'"}]}
+    assert_raise ArgumentError, ~r/fragment "\? = 'folder 1'"/, fn -> Coverage.check!(Attributes, query) end
+  end
+
+  test "the walk follows a subquery, and the relationship's own columns are declared" do
+    members = from(m in Membership, where: m.account_id == "ann" and m.role == :reader, select: m.folder_id)
+    query = from(f in Folder, where: f.id in subquery(members))
+
+    assert Coverage.check(Attributes, query) == :ok
+    reads = Coverage.reads(query)
+    assert {Membership, :account_id} in reads
+    assert {Membership, :role} in reads
+    assert {Folder, :id} in reads
+  end
+
+  test "the foreign key of a carried relation is declared on the schema that holds it" do
+    assert Coverage.check(Attributes, from(i in Item, where: not is_nil(i.folder_id))) == :ok
+  end
+
+  test "a field of a source that is no schema is covered by the walk of that source" do
+    members = from(m in Membership, select: %{folder: m.folder_id})
+
+    assert Coverage.check(Attributes, from(s in subquery(members), where: s.folder > 0)) == :ok
+  end
+
+  test "the walk follows the query behind a source, so a column it reads is a finding" do
+    named = from(f in Folder, select: %{name: f.name})
+
+    assert Coverage.check(Attributes, from(s in subquery(named), where: not is_nil(s.name))) ==
+             {:error, [{Folder, :name}]}
+  end
+
+  test "the walk follows each query a union combines with" do
+    ids = from(f in Folder, select: %{id: f.id})
+    names = from(f in Folder, select: %{id: f.name})
+
+    assert Coverage.check(Attributes, union_all(ids, ^names)) == {:error, [{Folder, :name}]}
+  end
+
+  test "the walk reads every clause of a query, not the filter alone" do
+    query =
+      from(f in Folder,
+        join: m in Membership,
+        on: m.folder_id == f.id,
+        where: m.account_id == "ann",
+        group_by: f.name,
+        having: count(m.id) > 0,
+        order_by: f.name,
+        select: f.name
+      )
+
+    assert Coverage.check(Attributes, query) == {:error, [{Folder, :name}]}
+  end
+end

@@ -1,0 +1,25 @@
+model
+  schema 1.1
+
+type user
+
+type clearance
+  relations
+    define member: [user]
+
+type folder
+  relations
+    define reader: [user with grant_holds]
+    define editor: [user with grant_holds]
+    define can_read: reader or editor
+    define can_edit: editor
+
+type item
+  relations
+    define folder: [folder]
+    define can_read: can_read from folder
+    define can_edit: can_edit from folder
+
+condition grant_holds(clearance: string, kind: string, expires_at: timestamp, subject_kind: string, current_time: timestamp) {
+  clearance == "cleared" && kind == subject_kind && expires_at > current_time
+}

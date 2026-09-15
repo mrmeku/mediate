@@ -1,0 +1,60 @@
+defmodule Mediate.Cerbos.Sidecar do
+  @moduledoc """
+  A sidecar of one test's own, over a policy directory of that test's own.
+
+  The run's sidecar serves the conformance policies where they sit in the
+  repository, and every test asks it at once. A test that writes a policy
+  cannot use it, because the write changes what another test reads
+  (`docs/contributing.md` §2). So the test gets a directory under `tmp/`,
+  with a copy of the conformance policies or with policy files of its own.
+  A server on that directory stops when the test ends.
+  """
+
+  use Boundary, top_level?: true, deps: [Mediate.Cerbos, Mediate.Test]
+
+  alias Mediate.Dev
+
+  @conformance "priv/conformance"
+
+  @doc "A sidecar over a copy of the conformance policies."
+  @spec own!() :: Dev.Cerbos.t()
+  def own! do
+    started(fn directory ->
+      Enum.each(conformance(), fn {name, text} -> File.write!(Path.join(directory, name), text) end)
+    end)
+  end
+
+  @doc "A sidecar over the policy files given, each by its path and its text."
+  @spec over!([{String.t(), String.t()}]) :: Dev.Cerbos.t()
+  def over!(policies) when is_list(policies) do
+    started(fn directory -> Enum.each(policies, &write!(directory, &1)) end)
+  end
+
+  @doc "The conformance policies, by file name, in the order the directory holds them."
+  @spec conformance() :: [{String.t(), String.t()}]
+  def conformance do
+    paths =
+      @conformance
+      |> Path.join("*.yaml")
+      |> Path.wildcard()
+      |> Enum.sort()
+
+    for path <- paths, do: {Path.basename(path), File.read!(path)}
+  end
+
+  defp started(write) do
+    directory = Path.join([File.cwd!(), "tmp", "own-" <> suffix()])
+    policies = Path.join(directory, "policies")
+    File.mkdir_p!(policies)
+    write.(policies)
+    Dev.Cerbos.start_supervised!(policies: policies, dir: directory)
+  end
+
+  defp write!(directory, {path, text}) do
+    full = Path.join(directory, path)
+    File.mkdir_p!(Path.dirname(full))
+    File.write!(full, text)
+  end
+
+  defp suffix, do: Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
+end

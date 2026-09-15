@@ -1,0 +1,31 @@
+defmodule Mediate.Test.AroundAdapter do
+  @moduledoc """
+  The fake adapter plus `around_query/3`, which sends the test process the
+  query or changeset and the decision the seam handed it, then runs the
+  call. Test support only.
+  """
+
+  @behaviour Mediate.Adapter
+
+  use Boundary, top_level?: true, deps: [Mediate, Mediate.Test]
+
+  alias Mediate.Test.Fake
+
+  @impl Mediate.Adapter
+  defdelegate options_schema, to: Fake
+
+  @impl Mediate.Adapter
+  defdelegate scope_cap, to: Fake
+
+  @impl Mediate.Adapter
+  defdelegate decide(subject, operation, object, environment, options), to: Fake
+
+  @impl Mediate.Adapter
+  defdelegate scope(subject, operation, object_type, environment, options), to: Fake
+
+  @impl Mediate.Adapter
+  def around_query(query_or_changeset, decision, fun) when is_function(fun, 0) do
+    send(self(), {:around_query, query_or_changeset, decision})
+    fun.()
+  end
+end

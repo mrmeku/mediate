@@ -1,0 +1,146 @@
+defmodule Mediate.Config do
+  @moduledoc """
+  The only runtime configuration the library reads. `boot!/1` validates it
+  once at boot from a `NimbleOptions` schema and stores it. The port and
+  the seam call `resolve/0`. It answers the boot struct under the overrides
+  `Mediate.Test.with_config/1` put in the process dictionary of the caller
+  or of a process in its `$callers` chain.
+
+  Fields: #{NimbleOptions.docs(Mediate.Domain.ConfigSchema.schema())}
+  """
+
+  alias Mediate.Domain.ConfigSchema
+  alias Mediate.Error
+
+  @enforce_keys [:adapter, :clock, :caps]
+  defstruct @enforce_keys
+
+  @type adapter :: module() | {module(), keyword()}
+  @type clock :: (-> DateTime.t())
+  @type caps :: [policy_content_bytes: pos_integer()]
+
+  @type t :: %__MODULE__{adapter: adapter(), clock: clock(), caps: caps()}
+
+  @doc "Validate a keyword list into the struct."
+  @spec new(keyword()) :: {:ok, t()} | {:error, Error.t()}
+  def new(options) when is_list(options) do
+    with {:ok, validated} <- validate(options),
+         {:ok, adapter} <- validate_adapter(validated[:adapter]) do
+      {:ok, %__MODULE__{adapter: adapter, clock: validated[:clock], caps: validated[:caps]}}
+    end
+  end
+
+  @doc "`new/1`, and it raises the error."
+  @spec new!(keyword()) :: t()
+  def new!(options) when is_list(options) do
+    case new(options) do
+      {:ok, config} -> config
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Validate once at boot and keep the struct for `resolve/0`."
+  @spec boot!(keyword()) :: t()
+  def boot!(options) when is_list(options) do
+    config = new!(options)
+    :persistent_term.put(__MODULE__, config)
+    config
+  end
+
+  @doc "The boot struct under this process's overrides, or an error when neither exists."
+  @spec resolve() :: {:ok, t()} | {:error, Error.t()}
+  def resolve do
+    overrides = overrides()
+
+    case :persistent_term.get(__MODULE__, nil) do
+      %__MODULE__{} = base -> new(Keyword.merge(to_keyword(base), overrides))
+      nil when overrides == [] -> {:error, Error.invalid(:config, "nothing booted and no override")}
+      nil -> new(overrides)
+    end
+  end
+
+  @doc "The struct as the keyword list `new/1` accepts."
+  @spec to_keyword(t()) :: keyword()
+  def to_keyword(%__MODULE__{} = config) do
+    [adapter: config.adapter, clock: config.clock, caps: config.caps]
+  end
+
+  @doc "The adapter module and its options."
+  @spec adapter(t()) :: {module(), keyword()}
+  def adapter(%__MODULE__{adapter: {module, options}}), do: {module, options}
+  def adapter(%__MODULE__{adapter: module}) when is_atom(module), do: {module, []}
+
+  @doc false
+  @spec override_key() :: atom()
+  def override_key, do: __MODULE__
+
+  defp validate(options) do
+    case NimbleOptions.validate(Keyword.put_new(options, :clock, &DateTime.utc_now/0), ConfigSchema.schema()) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, %NimbleOptions.ValidationError{} = error} -> {:error, invalid(:config, Exception.message(error))}
+    end
+  end
+
+  defp validate_adapter({module, options}) when is_atom(module) and is_list(options) do
+    with :ok <- implements(module, Mediate.Adapter, :adapter),
+         {:ok, options} <- validate_options(module, options, :adapter) do
+      {:ok, {module, options}}
+    end
+  end
+
+  defp validate_adapter(module) when is_atom(module), do: validate_adapter({module, []})
+
+  defp implements(module, behaviour, what) do
+    behaviours =
+      if Code.ensure_loaded?(module) do
+        :attributes
+        |> module.module_info()
+        |> Keyword.get_values(:behaviour)
+        |> List.flatten()
+      else
+        []
+      end
+
+    if behaviour in behaviours do
+      :ok
+    else
+      {:error, invalid(what, "#{inspect(module)} does not implement #{inspect(behaviour)}")}
+    end
+  end
+
+  defp validate_options(module, options, what) do
+    cond do
+      function_exported?(module, :options_schema, 0) ->
+        case NimbleOptions.validate(options, module.options_schema()) do
+          {:ok, validated} -> {:ok, validated}
+          {:error, error} -> {:error, invalid(what, "#{inspect(module)}: " <> Exception.message(error))}
+        end
+
+      options == [] ->
+        {:ok, []}
+
+      true ->
+        {:error, invalid(what, "#{inspect(module)} takes no options, got: #{inspect(options)}")}
+    end
+  end
+
+  defp invalid(what, detail), do: Error.invalid(what, detail)
+
+  # This reads the override from the current process, then from each
+  # process in its `$callers` chain, nearest first. The first one found
+  # wins.
+  defp overrides do
+    [self() | List.wrap(Process.get(:"$callers", []))]
+    |> Enum.map(&overrides_of/1)
+    |> Enum.find([], &(&1 != []))
+  end
+
+  defp overrides_of(pid) when pid == self(), do: Process.get(__MODULE__, [])
+
+  defp overrides_of(pid) do
+    case Process.info(pid, :dictionary) do
+      {:dictionary, dictionary} -> Keyword.get(dictionary, __MODULE__, [])
+      nil -> []
+    end
+  end
+end

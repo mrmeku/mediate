@@ -1,0 +1,43 @@
+# The example under RBAC in code
+
+The controlled-unclassified-information example of `example`, bound to the `Mediate.Rbac` adapter. This application is thin. It boots the configuration, binds a policy module to the example's repo, and carries the migrations. The tables below say what enforces each rule of the example under this binding. The domain, its contexts, and every scenario live in the example, and the mechanism lives in the adapter.
+
+## What binding costs
+
+- `ExampleRbac.Application`: the boot. It binds the policy, starts the repos and the consumer, and publishes the version.
+- `ExampleRbac.Infrastructure.Policy`: the role table and, per protected schema, the grants and predicates.
+- `lib/example_rbac/infrastructure/predicates.ex`: the `dynamic` expressions the policy names. It decides and touches nothing, so a test calls it directly.
+- `priv/repo/migrations/`: the example's tables, through the helpers the library packages ship. No migration carries a rule.
+- `priv/schema/rbac.sql`: the schema the migrations produce, which the gate regenerates and compares.
+- `config/dev.exs`: the development database `nix run .#services` raises.
+
+## The example's words in the adapter's words
+
+| The example says | The policy says |
+|---|---|
+| A program member or lead | `role :member`, `role :lead` |
+| A designating office's designator | `role :designator` held through `Example.Domain.OfficeRole` |
+| An approver of the office | `role :approver` held through `Example.Domain.OfficeRole` |
+| A document of a program | `grant :assignment` with `on: :program_id` through the open program |
+| A document of an office | `grant :office` with `on: :designating_office_id` |
+| The banner's controls, the categories' implied controls, the decontrol date | `predicate :controls` on `read` |
+| Re-authentication within the window | `predicate :session` on the marking operations |
+| A different approver | `predicate :another_approver` on `approve_marking` |
+
+## The mechanism per rule
+
+| Rule | Mechanism | Enforced by |
+|---|---|---|
+| C1 Lawful purpose | the `:assignment` and `:office` grants on every protected schema, which reach a document through its open program and its designating office | the adapter |
+| C2 Controls, all of | the `:controls` predicate, one subquery over the marking, the subject's row, and the designating agency, where any control that fails blocks the row | the adapter |
+| C3 Specified categories | the left join to `categories` inside that subquery, whose `implied_controls` widen the marking's declared ones | the adapter |
+| C4 Banner | the banner `Example.Application.Documents` keeps at write time, beside the `:controls` predicate on portions. That predicate reads the portion's own marking under the document's list and decontrol date | the application and the adapter |
+| C5 Decontrol | the `controlled` clause of the same subquery, which compares `documents.decontrol` with the moment the port stamped on the call | the adapter |
+| C6 Named list | the `named_list` clause, membership of the document marking's `list`, which combines with nothing else | the adapter |
+| C7 Marking gates | the role table, which grants the marking operations to the designator alone. The seam refuses the write itself without a decision for the operation | the seam |
+| C8 Re-authentication | the `:session` predicate, which reads `reauthenticated_at` from the environment the port stamped the call with | the adapter |
+| C9 Separation of duties | the `:office` grant on the proposal beside the `:another_approver` predicate, which requires a proposer who is someone else | the adapter |
+| C10 Audited override | the read runs under a declared exemption. Permission, justification, event, and report are the example's code | the application |
+| C11 Continuous evaluation | every predicate is a `dynamic` expression the adapter puts in the query at the call, so the next call no longer admits a revoked row | the adapter |
+| C12 Revocation clock | measured and recorded beside the configured maximum, never asserted | the adapter |
+| C13 Scope fidelity | the same grants and predicates compose the query `scope` returns, so the rows it yields are exactly the ones `check` admits | the adapter |

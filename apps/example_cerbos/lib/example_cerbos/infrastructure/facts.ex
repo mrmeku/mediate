@@ -1,0 +1,175 @@
+defmodule ExampleCerbos.Infrastructure.Facts do
+  @moduledoc """
+  The subqueries the attribute declarations name. There is one per attribute
+  whose value depends on the subject that asks, or on a derivation the
+  policies do not carry. Each selects the row the value belongs to and the
+  value as text, because text is what a policy compares.
+
+  `lib/example_cerbos/infrastructure/controls.ex` holds the derivation behind
+  two of them. It says which controls are effective on a marking. For a
+  portion, it also says whether its document is still under control. The
+  second test compares against the moment the port stamped the request
+  with. This module cuts that moment to the second, as the adapter cuts
+  the request-time facts it sends to the sidecar.
+
+  Every column read here is a declared fact of the example.
+  `ExampleCerbos.CoverageTest` holds it there.
+  """
+
+  import Ecto.Query, only: [from: 2]
+
+  alias Example.Domain.Agency
+  alias Example.Domain.Assignment
+  alias Example.Domain.Document
+  alias Example.Domain.Marking
+  alias Example.Domain.Office
+  alias Example.Domain.OfficeRole
+  alias Example.Domain.Portion
+  alias Example.Domain.Program
+  alias Example.Domain.Proposal
+  alias Example.Domain.User
+  alias ExampleCerbos.Infrastructure.Controls
+
+  @doc "The roles the subject holds through an open program, by document (C1)."
+  @spec program_roles(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def program_roles({_kind, id}, %{now: _now}) do
+    from(a in Assignment,
+      join: p in Program,
+      on: p.id == a.program_id,
+      join: d in Document,
+      on: d.program_id == p.id,
+      where: a.user_id == ^id and is_nil(p.closed_at),
+      select: %{id: d.id, value: type(a.role, :string)}
+    )
+  end
+
+  @doc "The roles the subject holds in a document's designating office, by document (C1)."
+  @spec office_roles(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def office_roles({_kind, id}, %{now: _now}) do
+    from(r in OfficeRole,
+      join: d in Document,
+      on: d.designating_office_id == r.office_id,
+      where: r.user_id == ^id,
+      select: %{id: d.id, value: type(r.role, :string)}
+    )
+  end
+
+  @doc "The controls effective on a document's banner, declared or implied, by document (C2, C3)."
+  @spec effective_controls(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def effective_controls({_kind, _account}, %{now: _now}), do: Controls.on_documents()
+
+  @doc "The subject's nationality where a document's banner releases to it, by document (C2)."
+  @spec releasable_to(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def releasable_to({_kind, id}, %{now: _now}) do
+    from(m in Marking,
+      join: u in User,
+      on: u.id == ^id,
+      where: u.nationality in m.releasable_to,
+      select: %{id: m.document_id, value: u.nationality}
+    )
+  end
+
+  @doc "The nationality of the agency a document's designating office belongs to, by document (C2)."
+  @spec agency_nationalities(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def agency_nationalities({_kind, _account}, %{now: _now}) do
+    from(d in Document,
+      join: o in Office,
+      on: o.id == d.designating_office_id,
+      join: a in Agency,
+      on: a.id == o.agency_id,
+      select: %{id: d.id, value: a.nationality}
+    )
+  end
+
+  @doc "The subject's own id where a document's banner lists it, by document (C6)."
+  @spec listed(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def listed({_kind, id}, %{now: _now}) do
+    from(m in Marking,
+      where: ^id in m.list,
+      select: %{id: m.document_id, value: type(^id, :string)}
+    )
+  end
+
+  @doc "The roles the subject holds through an open program, by portion (C1)."
+  @spec portion_program_roles(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_program_roles({_kind, id}, %{now: _now}) do
+    from(a in Assignment,
+      join: p in Program,
+      on: p.id == a.program_id,
+      join: d in Document,
+      on: d.program_id == p.id,
+      join: portion in Portion,
+      on: portion.document_id == d.id,
+      where: a.user_id == ^id and is_nil(p.closed_at),
+      select: %{id: portion.id, value: type(a.role, :string)}
+    )
+  end
+
+  @doc "The roles the subject holds in the designating office of a portion's document, by portion (C1)."
+  @spec portion_office_roles(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_office_roles({_kind, id}, %{now: _now}) do
+    from(r in OfficeRole,
+      join: d in Document,
+      on: d.designating_office_id == r.office_id,
+      join: portion in Portion,
+      on: portion.document_id == d.id,
+      where: r.user_id == ^id,
+      select: %{id: portion.id, value: type(r.role, :string)}
+    )
+  end
+
+  @doc "The controls effective on a portion's own marking while its document is under control, by portion (C4, C5)."
+  @spec portion_effective_controls(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_effective_controls({_kind, _account}, %{now: now}) do
+    Controls.on_portions(DateTime.truncate(now, :second))
+  end
+
+  @doc "The subject's nationality where a portion's marking releases to it, by portion (C2)."
+  @spec portion_releasable_to(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_releasable_to({_kind, id}, %{now: _now}) do
+    from(portion in Portion,
+      join: u in User,
+      on: u.id == ^id,
+      where: u.nationality in portion.releasable_to,
+      select: %{id: portion.id, value: u.nationality}
+    )
+  end
+
+  @doc "The nationality of the agency behind a portion's document, by portion (C2)."
+  @spec portion_agency_nationalities(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_agency_nationalities({_kind, _account}, %{now: _now}) do
+    from(portion in Portion,
+      join: d in Document,
+      on: d.id == portion.document_id,
+      join: o in Office,
+      on: o.id == d.designating_office_id,
+      join: a in Agency,
+      on: a.id == o.agency_id,
+      select: %{id: portion.id, value: a.nationality}
+    )
+  end
+
+  @doc "The subject's own id where the document of a portion lists it, by portion (C4, C6)."
+  @spec portion_listed(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def portion_listed({_kind, id}, %{now: _now}) do
+    from(m in Marking,
+      join: portion in Portion,
+      on: portion.document_id == m.document_id,
+      where: ^id in m.list,
+      select: %{id: portion.id, value: type(^id, :string)}
+    )
+  end
+
+  @doc "The roles the subject holds in the designating office of a proposal's document, by proposal (C9)."
+  @spec proposal_office_roles(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
+  def proposal_office_roles({_kind, id}, %{now: _now}) do
+    from(r in OfficeRole,
+      join: d in Document,
+      on: d.designating_office_id == r.office_id,
+      join: proposal in Proposal,
+      on: proposal.document_id == d.id,
+      where: r.user_id == ^id,
+      select: %{id: proposal.id, value: type(r.role, :string)}
+    )
+  end
+end

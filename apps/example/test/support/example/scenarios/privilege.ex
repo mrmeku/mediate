@@ -1,0 +1,210 @@
+defmodule Example.Scenarios.Privilege do
+  @moduledoc "The least-privilege and separation-of-duties scenarios, lp-01 to lp-08 and sod-01 to sod-03."
+
+  use Boundary,
+    top_level?: true,
+    deps: [Example, Example.Fixture, Example.Scenarios.Support, Mediate, Mediate.Test, Ecto, ExUnit]
+
+  import Example.Scenarios.Support
+  import ExUnit.Assertions
+
+  alias Example.Application.Accounts
+  alias Example.Application.Documents
+  alias Example.Application.Proposals
+  alias Example.Application.Review
+  alias Example.Domain.Document
+  alias Example.Domain.Proposal
+  alias Example.Fixture
+
+  @noforn %{controls: [:no_foreign]}
+
+  @spec lp_01() :: term()
+  def lp_01 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+
+    settle()
+    assert_read(subject("ann"), document)
+    assert_refused(Documents.change_marking(subject("ann"), document.id, @noforn, fresh()), :change_marking)
+    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("ann"), document.id)
+  end
+
+  @spec lp_02() :: term()
+  def lp_02 do
+    world = Fixture.world!()
+    foreign = Fixture.document!(world, program: world.foreign_program, office: world.foreign_office)
+
+    settle()
+    assert_refused(Documents.change_marking(subject("dana"), foreign.id, @noforn, fresh()), :change_marking)
+    domestic = Fixture.document!(world)
+
+    settle()
+    assert_refused(Documents.change_marking(subject("hana"), domestic.id, @noforn, fresh()), :change_marking)
+    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), domestic.id)
+  end
+
+  @spec lp_03() :: term()
+  def lp_03 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+
+    settle()
+
+    assert {:ok, %Example.Domain.Marking{controls: [:no_foreign]}} =
+             Documents.change_marking(subject("dana"), document.id, @noforn, fresh())
+
+    settle()
+    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+  end
+
+  @spec lp_04() :: term()
+  def lp_04 do
+    world = Fixture.world!()
+    document = Fixture.document!(world, controls: [:federal_only])
+    at = DateTime.shift(DateTime.utc_now(), minute: -1)
+
+    settle()
+    assert_refused(Documents.set_decontrol(subject("ann"), document.id, at, fresh()), :set_decontrol)
+    assert_refused(Documents.decontrol(subject("eve"), document.id, fresh()), :decontrol)
+    assert_denied(subject("bob"), document)
+    assert {:ok, %Document{decontrol: %DateTime{}}} = Documents.set_decontrol(subject("dana"), document.id, at, fresh())
+
+    settle()
+    assert_read(subject("bob"), document)
+  end
+
+  @spec lp_05() :: term()
+  def lp_05 do
+    world = Fixture.world!()
+    document = Fixture.document!(world, portions: [%{body: "open"}])
+    [portion] = document.portions
+    tightened = %{controls: [:no_foreign]}
+
+    settle()
+
+    for id <- ["ann", "eve", "hana"] do
+      assert_refused(Documents.change_portion_marking(subject(id), portion.id, tightened, fresh()), :change_marking)
+    end
+
+    assert {:ok, %Example.Domain.Portion{controls: [:no_foreign]}} =
+             Documents.change_portion_marking(subject("dana"), portion.id, tightened, fresh())
+
+    settle()
+    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+  end
+
+  @spec lp_06() :: term()
+  def lp_06 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+
+    settle()
+    assert_denied(subject("frank"), document)
+
+    assert {:error, %Documents.OverrideRefused{reason: :not_privileged}} =
+             Documents.override_read(subject("frank"), document.id, "incident 12")
+
+    assert Documents.override_reports(world.office.id) == []
+  end
+
+  @spec lp_07() :: term()
+  def lp_07 do
+    world = Fixture.world!()
+    document = Fixture.document!(world, controls: [:named_list], list: ["frank"])
+    ordinary = subject("gil-user")
+    assert {:user, _id} = ordinary
+
+    settle()
+    assert_denied(ordinary, document)
+
+    assert {:error, %Documents.OverrideRefused{reason: :not_privileged}} =
+             Documents.override_read(ordinary, document.id, "incident 12")
+
+    assert {:ok, %Document{}} = Documents.override_read(subject("gil"), document.id, "incident 12")
+    assert [%{user_id: "gil"}] = Documents.override_reports(world.office.id)
+  end
+
+  @spec lp_08() :: term()
+  def lp_08 do
+    world = Fixture.world!()
+    document = Fixture.document!(world, controls: [:federal_only])
+
+    settle()
+    report = Review.report(subject("eve"), fresh())
+    assert report =~ "agency Domestic"
+    assert report =~ "ann reads [#{document.id}]"
+    assert report =~ "bob reads []"
+    assert report =~ "dana may change_marking [#{document.id}]"
+    assert report =~ "ann may change_marking []"
+    assert report =~ "eve may change_marking []"
+    assert report =~ "privileged accounts"
+    assert report =~ "gil (person gil) holds [override]"
+    refute report =~ "gil-user (person"
+  end
+
+  @spec sod_01() :: term()
+  def sod_01 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+
+    settle()
+    assert {:ok, proposal} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+
+    settle()
+
+    assert {:ok, %Proposal{status: :approved, approver_id: "eve"}} =
+             Proposals.approve(subject("eve"), proposal.id, fresh())
+
+    settle()
+    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+    assert {:error, :not_found} = Proposals.approve(subject("eve"), proposal.id, fresh())
+  end
+
+  @spec sod_02() :: term()
+  def sod_02 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+    _role = Accounts.office_role("dana", world.office.id, :approver)
+
+    refute_own_approval(document)
+    assert_approval_of_another(world, document)
+  end
+
+  @spec sod_03() :: term()
+  def sod_03 do
+    world = Fixture.world!()
+    document = Fixture.document!(world)
+
+    settle()
+    assert {:ok, %Proposal{status: :pending}} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+
+    settle()
+    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
+    assert_read(subject("carl"), document)
+  end
+
+  # An account with both roles cannot approve what it proposed. The port
+  # refuses the approval, and the marking stays where it was.
+  defp refute_own_approval(document) do
+    settle()
+    assert {:ok, proposal} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+
+    settle()
+    assert_refused(Proposals.approve(subject("dana"), proposal.id, fresh()), :approve_marking)
+    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
+  end
+
+  # The same account approves what another proposed. So it holds the role,
+  # and what it lacks is the standing to approve its own proposal.
+  defp assert_approval_of_another(world, document) do
+    _role = Accounts.office_role("eve", world.office.id, :designator)
+
+    settle()
+    assert {:ok, other} = Proposals.propose(subject("eve"), document.id, %{controls: [:federal_only]}, fresh())
+
+    settle()
+
+    assert {:ok, %Proposal{status: :approved, approver_id: "dana"}} =
+             Proposals.approve(subject("dana"), other.id, fresh())
+  end
+end

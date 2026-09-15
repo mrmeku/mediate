@@ -1,0 +1,102 @@
+name: ci
+
+# Versions verified at https://api.github.com/repos/<owner>/<repo>/releases/latest on 2026-09-08.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3, 4]
+    env:
+      MIX_ENV: test
+      MIX_TEST_PARTITION: ${{ matrix.partition }}
+      MIX_TEST_PARTITIONS: "4"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      - run: nix develop --command mix quality
+
+  # The second of the two numbers, in a run of its own: a partitioned run
+  # measures coverage over a part of the suite, so this one takes the whole
+  # of it, and holds every module under a `domain/` to every line. The first
+  # number, the runtime dependency count of mediate, is a test in that
+  # package's own suite and runs in the job above.
+  domain_coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      - run: nix develop --command mix test.domain
+
+  # One job per thin application, each in its own directory. `nix develop`
+  # reads the flake at the root, so a step enters the directory inside the
+  # shell the flake gives rather than through working-directory.
+  example_rbac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      # The migrations of this application, run on a cluster of its own, and
+      # the schema they produce written to the file the next step holds them to.
+      - run: nix develop --command bash -c 'cd apps/example_rbac && mix mediate.schema_dump'
+      - run: git diff --exit-code priv/schema/
+        working-directory: apps/example_rbac
+      # The whole scenario file, under the one binding whose rules are
+      # Elixir, so the run needs no engine beside the database.
+      - run: nix develop --command bash -c 'cd apps/example_rbac && mix test --warnings-as-errors --cover'
+
+  example_postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      # The dump is the teaching artifact for this adapter: the policies of
+      # every protected table as the database reports them.
+      - run: nix develop --command bash -c 'cd apps/example_postgres && mix mediate.schema_dump'
+      - run: git diff --exit-code priv/schema/
+        working-directory: apps/example_postgres
+      - run: nix develop --command bash -c 'cd apps/example_postgres && mix test --warnings-as-errors --cover'
+
+  example_cerbos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      # The second migration of this application creates nothing, so the dump
+      # is the example's tables alone, which is what holds the rules to the
+      # policy files rather than to the database.
+      - run: nix develop --command bash -c 'cd apps/example_cerbos && mix mediate.schema_dump'
+      - run: git diff --exit-code priv/schema/
+        working-directory: apps/example_cerbos
+      # The sidecar the suite starts is the `cerbos` binary the flake pins, on
+      # a copy of the policy files under `tmp/`, so the run needs no container.
+      - run: nix develop --command bash -c 'cd apps/example_cerbos && mix test --warnings-as-errors --cover'
+
+  example_fga:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      # The second migration of this application creates the marker outbox
+      # and the cursor the drain keeps its place in, which is what holds the
+      # store to the tables one change at a time.
+      - run: nix develop --command bash -c 'cd apps/example_fga && mix mediate.schema_dump'
+      - run: git diff --exit-code priv/schema/
+        working-directory: apps/example_fga
+      # The server the suite asks is the `openfga` binary the flake pins, on a
+      # free port with the in-memory datastore, so the run needs no container
+      # and leaves nothing behind.
+      - run: nix develop --command bash -c 'cd apps/example_fga && mix test --warnings-as-errors --cover'

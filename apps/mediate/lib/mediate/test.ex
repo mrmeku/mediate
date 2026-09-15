@@ -1,0 +1,177 @@
+defmodule Mediate.Test do
+  @moduledoc """
+  Helpers every test tier and a third party's adapter suite share:
+
+  - the configuration override
+  - the clock a test sets
+  - the settle of the configured adapter's own state
+  - a poll with a deadline in place of a sleep
+
+  The core package ships them, so Tier 1 can run outside this repository.
+  """
+
+  use Boundary,
+    top_level?: true,
+    deps: [Mediate, Ecto, NimbleOptions],
+    exports: [Clock, Fake]
+
+  alias Mediate.Access
+  alias Mediate.Change
+  alias Mediate.Config
+
+  @default_timeout 5_000
+  @interval 10
+  @control ~r/^\s*(begin|commit|rollback|savepoint|release)\b/i
+
+  @doc """
+  Override configuration fields for the rest of the current process.
+  `Mediate.Config.resolve/0` reads the override from the caller and from
+  its `$callers` chain, over the boot struct when one exists.
+  """
+  @spec with_config(keyword()) :: :ok
+  def with_config(overrides) when is_list(overrides) do
+    current = Process.get(Config.override_key(), [])
+    Process.put(Config.override_key(), Keyword.merge(current, overrides))
+    :ok
+  end
+
+  @doc "Override configuration fields around a function, and restore the previous override after it."
+  @spec with_config(keyword(), (-> result)) :: result when result: term()
+  def with_config(overrides, fun) when is_list(overrides) and is_function(fun, 0) do
+    previous = Process.get(Config.override_key(), [])
+    :ok = with_config(overrides)
+
+    try do
+      fun.()
+    after
+      Process.put(Config.override_key(), previous)
+    end
+  end
+
+  @doc """
+  Bring the configured adapter's own state into step with the tables and
+  answer `:ok`. An adapter that keeps no state of its own has nothing to
+  settle, and the answer is `:none`. So a shared scenario can settle after
+  it writes facts without an adapter's name. A settle that fails raises
+  what it failed with, because a scenario that cannot settle cannot ask
+  its question.
+  """
+  @spec settle() :: :ok | :none
+  def settle do
+    {:ok, config} = Config.resolve()
+    {adapter, _options} = Config.adapter(config)
+
+    case settled(adapter) do
+      :ok -> :ok
+      :none -> :none
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc """
+  The SQL statements the current process ran on `repo` while `fun` ran, in
+  order. They come from the repo's `[..., :query]` telemetry, without
+  transaction control. Only this process's queries count, so async tests
+  never see one another's.
+  """
+  @spec queries(module(), (-> term())) :: {term(), [String.t()]}
+  def queries(repo, fun) when is_atom(repo) and is_function(fun, 0) do
+    event = List.insert_at(repo.config()[:telemetry_prefix], -1, :query)
+    id = {__MODULE__, make_ref()}
+    :ok = :telemetry.attach(id, event, &__MODULE__.__query__/4, %{pid: self(), id: id})
+
+    try do
+      result = fun.()
+      {result, collect(id, [])}
+    after
+      :telemetry.detach(id)
+    end
+  end
+
+  @doc """
+  The change events the current process published while `fun` ran, in
+  order, with what `fun` returned. Only this process's changes count, so
+  async tests never see one another's.
+  """
+  @spec changes((-> term())) :: {term(), [map()]}
+  def changes(fun) when is_function(fun, 0), do: published(Change.event(), fun)
+
+  @doc """
+  The access events the current process published while `fun` ran, in
+  order, with what `fun` returned. Only this process's reads count.
+  """
+  @spec accesses((-> term())) :: {term(), [map()]}
+  def accesses(fun) when is_function(fun, 0), do: published(Access.event(), fun)
+
+  @doc """
+  Calls `fun` until it returns a truthy value or `timeout` milliseconds pass.
+  Returns the truthy value. Raises with the last value on timeout. This is
+  the one place the suite sleeps.
+  """
+  @spec poll((-> term()), pos_integer()) :: term()
+  def poll(fun, timeout \\ @default_timeout) when is_function(fun, 0) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    poll_until(fun, deadline, nil)
+  end
+
+  @doc "The poll interval, the floor of any measurement `poll/2` takes, in milliseconds."
+  @spec poll_interval() :: pos_integer()
+  def poll_interval, do: @interval
+
+  @doc false
+  @spec __query__([atom()], map(), map(), map()) :: :ok
+  def __query__(_event, _measurements, %{query: query}, %{pid: pid, id: id}) do
+    if self() == pid and not Regex.match?(@control, query), do: send(pid, {id, query})
+    :ok
+  end
+
+  @doc false
+  @spec __published__([atom()], map(), map(), map()) :: :ok
+  def __published__(_event, _measurements, payload, %{pid: pid, id: id}) do
+    if self() == pid, do: send(pid, {id, payload})
+    :ok
+  end
+
+  defp published(event, fun) do
+    id = {__MODULE__, make_ref()}
+    :ok = :telemetry.attach(id, event, &__MODULE__.__published__/4, %{pid: self(), id: id})
+
+    try do
+      result = fun.()
+      {result, collect(id, [])}
+    after
+      :telemetry.detach(id)
+    end
+  end
+
+  defp settled(adapter) do
+    if Code.ensure_loaded?(adapter) and function_exported?(adapter, :settle, 0) do
+      adapter.settle()
+    else
+      :none
+    end
+  end
+
+  defp collect(id, collected) do
+    receive do
+      {^id, one} -> collect(id, [one | collected])
+    after
+      0 -> Enum.reverse(collected)
+    end
+  end
+
+  defp poll_until(fun, deadline, last) do
+    case fun.() do
+      falsy when falsy in [nil, false] ->
+        if System.monotonic_time(:millisecond) >= deadline do
+          raise "poll timed out; last value: #{inspect(last)}"
+        else
+          Process.sleep(@interval)
+          poll_until(fun, deadline, falsy)
+        end
+
+      value ->
+        value
+    end
+  end
+end

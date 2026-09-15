@@ -1,0 +1,165 @@
+defmodule Example.Domain.Document do
+  @moduledoc """
+  A document of a program. An office designates it, a banner marks it, and a
+  date decontrols it or none does. It carries its program, its designating
+  office, its marking, and its proposals, because a document decision admits
+  queries on them. It does not carry its portions, which have an object type
+  and decisions of their own.
+
+  The document, the marking, the portion, and the proposal share this file
+  because their associations refer to one another.
+  """
+
+  use Ecto.Schema
+  use Mediate.Schema
+
+  alias Example.Domain.Marking
+  alias Example.Domain.Office
+  alias Example.Domain.Portion
+  alias Example.Domain.Program
+  alias Example.Domain.Proposal
+
+  @type t :: %__MODULE__{}
+
+  schema "documents" do
+    field(:title, :string)
+    field(:decontrol, :utc_datetime)
+    belongs_to(:program, Program)
+    belongs_to(:designating_office, Office)
+    has_one(:marking, Marking)
+    has_many(:portions, Portion)
+    has_many(:proposals, Proposal)
+  end
+
+  object_type(:document)
+  carries([:program, :designating_office, :marking, :proposals])
+  audited(:entity)
+  fact(:decontrol, kind: :object_attribute, object: :id)
+  fact(:program_id, kind: :object_attribute, object: :id)
+  fact(:designating_office_id, kind: :object_attribute, object: :id)
+end
+
+defmodule Example.Domain.Marking do
+  @moduledoc """
+  A document's banner: categories, controls, the countries REL TO releases
+  to, and the DL ONLY list of accounts. Each set emits one fact event per
+  element. The list is a relationship whose subjects are its elements.
+  """
+
+  use Ecto.Schema
+  use Mediate.Schema
+
+  alias Example.Domain.Controls
+  alias Example.Domain.Document
+
+  @type t :: %__MODULE__{}
+
+  schema "markings" do
+    field(:categories, {:array, :string}, default: [])
+    field(:controls, {:array, Ecto.Enum}, values: Controls.all(), default: [])
+    field(:releasable_to, {:array, :string}, default: [])
+    field(:list, {:array, :string}, default: [])
+    belongs_to(:document, Document)
+  end
+
+  @doc "The marking fields, cast and validated. The list of accounts is a set."
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
+  def changeset(%__MODULE__{} = marking, attrs) when is_map(attrs) do
+    marking
+    |> Ecto.Changeset.cast(attrs, [:categories, :controls, :releasable_to, :list])
+    |> Ecto.Changeset.update_change(:list, &Enum.sort(Enum.uniq(&1)))
+  end
+
+  object_type(:marking)
+  audited(:entity)
+  fact(:categories, kind: :object_attribute, object: :document_id, element: :category)
+  fact(:controls, kind: :object_attribute, object: :document_id, element: :control)
+  fact(:releasable_to, kind: :object_attribute, object: :document_id, element: :country)
+  fact(:list, kind: :relationship, object: :document_id, element: :user)
+end
+
+defmodule Example.Domain.Portion do
+  @moduledoc """
+  A portion of a document with a marking of its own. The document's banner
+  combines the portions' markings and admits no subject any of them denies.
+  It carries its document, which the rules reach it through.
+  """
+
+  use Ecto.Schema
+  use Mediate.Schema
+
+  alias Example.Domain.Controls
+  alias Example.Domain.Document
+
+  @type t :: %__MODULE__{}
+
+  schema "portions" do
+    field(:body, :string)
+    field(:categories, {:array, :string}, default: [])
+    field(:controls, {:array, Ecto.Enum}, values: Controls.all(), default: [])
+    field(:releasable_to, {:array, :string}, default: [])
+    belongs_to(:document, Document)
+  end
+
+  @doc "The portion's marking fields, cast."
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
+  def changeset(%__MODULE__{} = portion, attrs) when is_map(attrs) do
+    Ecto.Changeset.cast(portion, attrs, [:categories, :controls, :releasable_to])
+  end
+
+  object_type(:portion)
+  carries([:document])
+  audited(:entity)
+  fact(:document_id, kind: :object_attribute, object: :id)
+  fact(:categories, kind: :object_attribute, object: :id, element: :category)
+  fact(:controls, kind: :object_attribute, object: :id, element: :control)
+  fact(:releasable_to, kind: :object_attribute, object: :id, element: :country)
+end
+
+defmodule Example.Domain.Proposal do
+  @moduledoc """
+  A marking change that one designator proposes and a different approver
+  approves. The proposal carries its document, so the approval decision
+  admits the marking it applies.
+  """
+
+  use Ecto.Schema
+  use Mediate.Schema
+
+  alias Example.Domain.Controls
+  alias Example.Domain.Document
+
+  @type t :: %__MODULE__{}
+
+  schema "marking_proposals" do
+    field(:proposer_id, :string)
+    field(:approver_id, :string)
+    field(:status, Ecto.Enum, values: [:pending, :approved], default: :pending)
+    field(:categories, {:array, :string}, default: [])
+    field(:controls, {:array, Ecto.Enum}, values: Controls.all(), default: [])
+    field(:releasable_to, {:array, :string}, default: [])
+    field(:list, {:array, :string}, default: [])
+    belongs_to(:document, Document)
+  end
+
+  @doc "A new proposal's marking fields, cast, with the proposer and the document."
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
+  def changeset(%__MODULE__{} = proposal, attrs) when is_map(attrs) do
+    proposal
+    |> Ecto.Changeset.cast(attrs, [:categories, :controls, :releasable_to, :list])
+    |> Ecto.Changeset.validate_required([:proposer_id, :document_id])
+  end
+
+  @doc "The marking the proposal carries."
+  @spec marking(t()) :: map()
+  def marking(%__MODULE__{} = proposal) do
+    Map.take(proposal, [:categories, :controls, :releasable_to, :list])
+  end
+
+  object_type(:proposal)
+  carries([:document])
+  audited(:entity)
+  fact(:document_id, kind: :object_attribute, object: :id)
+  fact(:proposer_id, kind: :object_attribute, object: :id)
+  relationship(subject: :proposer_id, object: :document_id, attributes: [:status])
+end

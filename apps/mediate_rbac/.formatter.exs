@@ -1,0 +1,9 @@
+locals_without_parens = [role: 2, object: 2, object: 3, grant: 2, grant: 3, predicate: 2, predicate: 3]
+
+[
+  plugins: [Styler],
+  import_deps: [:ecto, :nimble_options, :mediate],
+  inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"],
+  locals_without_parens: locals_without_parens,
+  export: [locals_without_parens: locals_without_parens]
+]

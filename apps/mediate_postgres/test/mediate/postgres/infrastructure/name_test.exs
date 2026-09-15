@@ -1,0 +1,25 @@
+defmodule Mediate.Postgres.NameTest do
+  use ExUnit.Case, async: true
+
+  alias Mediate.Error
+  alias Mediate.Postgres.Infrastructure.Name
+
+  test "a plain lowercase identifier passes, as an atom or as text" do
+    assert Name.check!("mediate_fixture_folders", :table) == "mediate_fixture_folders"
+    assert Name.check!(:read, :operation) == "read"
+    assert Name.check!("a1_2", :table) == "a1_2"
+  end
+
+  test "anything that would need quoting is refused, and the error names what was being named" do
+    for refused <- ["Folders", "folders; drop table x", "folder-1", "1folder", "", "folders\"x"] do
+      assert_raise Error, fn -> Name.check!(refused, :table) end
+    end
+
+    assert %Error{reason: :invalid, detail: "invalid policy: " <> _rest} = catch_error(Name.check!("A", :policy))
+  end
+
+  test "a name longer than the identifier limit is refused" do
+    assert_raise Error, fn -> Name.check!(String.duplicate("a", 64), :table) end
+    assert Name.check!(String.duplicate("a", 63), :table) == String.duplicate("a", 63)
+  end
+end

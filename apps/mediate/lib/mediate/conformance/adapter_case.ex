@@ -4,8 +4,11 @@ defmodule Mediate.Conformance.AdapterCase do
   adapter: Mediate.Rbac, repo: Example.Infrastructure.Repo, world: Example.World`
   defines a test module. Its setup prepares the repo for the test, stubs
   the clock, and binds the adapter through the configuration override. So
-  each adapter's conformance run is its own module, and all of them run in
-  one `mix test`.
+  each adapter's conformance run is its own module in its own package, and
+  each package's suite is its own OS process. Every adapter in this
+  repository passes `async: false`, `sandbox:`, `setup_queries:`,
+  `committed:`, and `versions:`. Cerbos, OpenFGA, and Postgres pass
+  `outage:`, and OpenFGA passes `seed:`.
 
   The template names no schema and no rule. `world:` is a
   `Mediate.Conformance.World`. That module says what a population holds,

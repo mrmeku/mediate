@@ -1,5 +1,6 @@
-# The neutral fixture's rule for a folder, tightened: a reader's
-# membership alone admits a read, so the granted editor is denied.
+# The neutral fixture's rule for a folder, as Cerbos policy: a cleared
+# principal with any membership may read it, an editor may edit it, and
+# `share` is here for the test of the plan the compiler cannot express.
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: default
@@ -13,7 +14,10 @@ resourcePolicy:
           all:
             of:
               - expr: request.principal.attr.clearance == "cleared"
-              - expr: '"reader" in request.resource.attr.member_roles'
+              - any:
+                  of:
+                    - expr: '"reader" in request.resource.attr.member_roles'
+                    - expr: '"editor" in request.resource.attr.member_roles'
     - actions: ["edit"]
       effect: EFFECT_ALLOW
       roles: ["user", "non_person_entity", "privileged"]

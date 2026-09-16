@@ -49,12 +49,18 @@ defmodule Mediate.Schema do
         use Ecto.Schema
         use Mediate.Schema
 
-        object_type :marking
-        carries [:portions]
-        audited :entity
-        fact :controls, kind: :object_attribute, object: :document_id, element: :control
-        relationship subject: :user_id, object: :program_id, attributes: [:role]
+        object_type(:marking)
+        audited(:entity)
+        fact(:categories, kind: :object_attribute, object: :document_id, element: :category)
+        fact(:controls, kind: :object_attribute, object: :document_id, element: :control)
+        fact(:releasable_to, kind: :object_attribute, object: :document_id, element: :country)
+        fact(:list, kind: :relationship, object: :document_id, element: :user)
       end
+
+  A schema that declares an object type is protected: the seam refuses to
+  read or write it without a decision. A schema that declares
+  `carries/1` names the associations the root's decision covers. A grant
+  row declares `relationship/1` with its subject and object columns.
 
   `__mediate__/1` answers each declaration:
 
@@ -120,7 +126,7 @@ defmodule Mediate.Schema do
     end
   end
 
-  @doc "Declare what kind of thing a row of this schema is, which is what makes its writes audited."
+  @doc "Declare what kind of thing a row of this schema is, which is what makes its writes audited. An audited schema need not declare an object type, and then the seam records its writes and passes them without a decision."
   defmacro audited(kind) do
     quote bind_quoted: [kind: kind] do
       Mediate.Schema.__declare_kind__(__MODULE__, kind)

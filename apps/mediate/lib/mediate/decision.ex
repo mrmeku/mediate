@@ -1,5 +1,5 @@
 defmodule Mediate.Decision do
-  @moduledoc "What the port said, when, from what state, under which rules."
+  @moduledoc "The stamped answer: what the port said, when, from what state, under which rules. It is the value the seam accepts under `mediate:`."
 
   alias Mediate.Answer
 

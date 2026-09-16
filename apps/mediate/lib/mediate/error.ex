@@ -8,8 +8,11 @@ defmodule Mediate.Error do
   library and not to a decider:
 
   - `:unsupported`, for what an adapter or a configuration cannot do
-  - `:invalid`, for a value at an edge that did not validate
-  - `:unmediated`, for a query that reached the seam with no decision
+  - `:invalid`, for a value at an edge that did not validate: a bulk write
+    or an upsert on an audited schema, a raw call given a decision, a bad
+    option, or a configuration that did not boot
+  - `:unmediated`, for a call that reached the seam with no decision and no
+    exemption
   """
 
   alias Mediate.Answer

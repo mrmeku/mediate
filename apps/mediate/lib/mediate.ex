@@ -2,7 +2,17 @@ defmodule Mediate do
   @moduledoc """
   The port: the one place an application asks whether a subject can perform
   an operation on an object. It is also the contract every adapter
-  implements.
+  implements. The words are NIST SP 800-162's: subject, object, operation,
+  and environment.
+
+  - `authorize/4` when the call reaches the repo: it answers the decision
+    the seam accepts under `mediate:`.
+  - `check/4` when a branch needs a yes or no and reaches no repo.
+  - `scope/4` when a query covers a whole type: it answers a `dynamic` the
+    query carries, which can only narrow, and a decision whose object id is
+    `nil`.
+  - `review/5` when a reviewer asks who can do what today: one `scope` per
+    subject under the reviewer's operation id, with `nil` ids alike.
 
   This module is the top-layer boundary. Everything under `Mediate` that is
   not `Mediate.Test` or `Mediate.Conformance` belongs to it. It can reach

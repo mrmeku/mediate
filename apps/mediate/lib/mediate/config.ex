@@ -1,10 +1,13 @@
 defmodule Mediate.Config do
   @moduledoc """
   The only runtime configuration the library reads. `boot!/1` validates it
-  once at boot from a `NimbleOptions` schema and stores it. The port and
-  the seam call `resolve/0`. It answers the boot struct under the overrides
-  `Mediate.Test.with_config/1` put in the process dictionary of the caller
-  or of a process in its `$callers` chain.
+  once at boot from a `NimbleOptions` schema and stores it. The adapter is
+  a module or a `{module, keyword}` pair, and a bare module means `[]`,
+  which the adapter's `options_schema/0` still validates. The port and the
+  seam call `resolve/0`. It answers the boot struct under the overrides
+  `Mediate.Test.with_config/1` put in the process dictionary. It takes the
+  first non-empty override, from the caller and then from each process in
+  its `$callers` chain, and merges it over the boot struct field by field.
 
   Fields: #{NimbleOptions.docs(Mediate.Domain.ConfigSchema.schema())}
   """

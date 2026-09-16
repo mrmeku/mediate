@@ -6,7 +6,11 @@ defmodule Example.Infrastructure.Siem do
 
   A deployment sends those records to its security log. A list keeps the
   mapping under test and puts no schema version in a published package. The
-  mapping is this package's own and answers from the payload alone.
+  mapping lives in the Ocsf module beside this one, against OCSF 1.3.0,
+  and `schema_version/0` answers that version. It answers from the payload
+  alone. What OCSF names no field for travels under `unmapped`. A decision
+  event with `verdict: nil`, one whose call raised, is dropped, because it
+  is no decision.
 
   Records arrive as casts, and a caller reads them with calls. So a caller
   that caused an event reads its own records afterwards. The thin

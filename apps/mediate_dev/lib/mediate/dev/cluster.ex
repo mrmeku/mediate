@@ -2,19 +2,29 @@ defmodule Mediate.Dev.Cluster do
   @moduledoc """
   One ephemeral Postgres cluster per `mix test` run, and per schema dump.
 
-  `start/1` does the steps `docs/contributing.md` §2 lists, from `initdb`
-  to the start of the caller's repos. The cluster stops and its directory
-  goes away when the suite ends. So a VM that runs several suites in turn,
-  the umbrella root's `mix test`, starts each app's cluster afresh. A run
-  that is no suite, a schema dump's, stops it at VM exit.
+  `start/1` takes about one second and does these steps in order:
 
-  The roles are `mediate_owner`, which owns every table and runs the
-  migrations, and `mediate_app`, which the application connects as and
-  which carries `NOBYPASSRLS`. The databases are `mediate_test` for the
-  sandboxed tier and `mediate_committed` for the committed tier. Everything
-  here goes through `psql`, `initdb`, and `pg_ctl`. So this module needs
-  `ecto` and nothing from `ecto_sql`, and the sandbox mode is the caller's
-  to set.
+  1. `initdb` into `tmp/pg-<random>/data` with `--auth=trust`.
+  2. `pg_ctl start` on a unix socket alone, with no TCP port and
+     `fsync=off`.
+  3. Create the roles: `mediate_owner`, which owns every table and runs the
+     migrations, and `mediate_app`, which the application connects as and
+     which carries `NOBYPASSRLS`.
+  4. Create the databases: `mediate_test` for the sandboxed tier and
+     `mediate_committed` for the committed tier.
+  5. Run the caller's `migrate:` function once per database, as the owner.
+  6. Put each repo's connection in the application env. This is the one
+     place in a test run that calls `Application.put_env`, and it runs
+     before any repo starts.
+  7. Start the caller's repos, and register `stop_all/1` with
+     `ExUnit.after_suite/1` and `System.at_exit/1`. The cluster stops and
+     its directory goes away when the suite ends, or at VM exit for a run
+     that is no suite.
+
+  So a VM that runs several suites in turn, the umbrella root's
+  `mix test`, starts each app's cluster afresh. Everything here goes
+  through `psql`, `initdb`, and `pg_ctl`. So this module needs `ecto` and
+  nothing from `ecto_sql`, and the sandbox mode is the caller's to set.
   """
 
   use Boundary, top_level?: true, deps: [NimbleOptions]

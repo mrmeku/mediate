@@ -241,6 +241,9 @@ defmodule Mediate.Infrastructure.Seam do
     end
   end
 
+  # An upsert of fact fields is refused because `RETURNING` cannot say
+  # which rows were inserts and which were updates, so no change event
+  # could say either.
   defp refuse_upsert({name, arity}, schema, opts) do
     if Schema.fact_schema?(schema) and Keyword.get(opts, :on_conflict, :raise) != :raise do
       raise Error.invalid(

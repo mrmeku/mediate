@@ -13,6 +13,10 @@ defmodule Mediate.Adapter do
   rule is a query the database runs. `settle/0` says whether the adapter
   has state of its own to settle. An adapter that reads the application's
   own tables has none.
+
+  An adapter is domain-free. It names no schema and no rule of the
+  application, and the coverage test each adapter package carries holds it
+  to that.
   """
 
   alias Mediate.Answer

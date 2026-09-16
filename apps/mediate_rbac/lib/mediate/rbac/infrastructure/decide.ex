@@ -12,7 +12,7 @@ defmodule Mediate.Rbac.Infrastructure.Decide do
   #
   # This module rescues nothing a repo raises. The port turns any exception
   # a decider raises into a denial with `engine_unreachable`
-  # (`docs/design.md` §2). So this package names no driver's error, and a
+  # (`Mediate.Port`). So this package names no driver's error, and a
   # driver it does not carry needs no clause of its own.
 
   import Ecto.Query, only: [from: 2]

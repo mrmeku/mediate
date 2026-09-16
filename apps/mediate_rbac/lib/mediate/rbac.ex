@@ -4,7 +4,7 @@ defmodule Mediate.Rbac do
   `use Mediate.Rbac.Policy`, declares the role table as data. Per protected
   schema it declares the grants that hold a role on its rows and the
   predicates every allowed row must satisfy. The predicates are functions in
-  the same modules. The adapter takes no options (`docs/design.md` §7), so
+  the same modules. The adapter takes no options (`Mediate.Config`), so
   its configuration entry is the bare module. It finds the policy and the
   repo through the binding `Mediate.Rbac.Binding.bind/1` makes at boot
   beside the configuration.

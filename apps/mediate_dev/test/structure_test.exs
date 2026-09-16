@@ -12,8 +12,8 @@ defmodule StructureTest do
   name, so `lib/mix/tasks/mediate.schema_dump.ex` names
   `Mix.Tasks.Mediate.SchemaDump`.
 
-  Four more rules cover the three interior places `docs/design.md` §6 gives
-  a package:
+  Four more rules cover the three interior places `CONTRIBUTING.md` under
+  "Where a module goes" gives a package:
 
   - A module under `domain/` calls nothing that touches a process, a file,
     a clock, a table, or a node.
@@ -32,8 +32,7 @@ defmodule StructureTest do
   the effect rule and no dependency list does.
 
   `@exceptions` names each file that cannot follow the path rule, with its
-  reason. `docs/design.md` §6 states the rules and the two dependency gates
-  that shape the first.
+  reason. `CONTRIBUTING.md` under "Where a module goes" states the rules.
   """
 
   use ExUnit.Case, async: true

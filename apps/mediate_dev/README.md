@@ -1,9 +1,5 @@
 # Mediate dev
 
-The test tools of this repository. No adopter needs them. No published package depends on them outside its test environment. The moduledocs say what each does.
+*What is in this package? For a contributor.*
 
-- the ephemeral Postgres cluster of each `mix test` run, which `docs/contributing.md` §2 describes
-- the sandbox each case template checks out
-- the schema dump `mix mediate.schema_dump` writes under `priv/schema/`
-- one Cerbos sidecar and one OpenFGA server per test run
-- the structure test that holds every source file to `docs/design.md` §6
+The test tools of this repository, unpublished. It holds the ephemeral Postgres cluster each `mix test` starts, the sandbox each case template checks out, the Cerbos and OpenFGA launchers, the schema dump task, and the structure test. The `Mediate.Dev` moduledoc names each, and `Mediate.Dev.Cluster` says what the cluster does.

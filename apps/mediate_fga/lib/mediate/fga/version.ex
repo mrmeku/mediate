@@ -3,8 +3,8 @@ defmodule Mediate.Fga.Version do
   The policy version of this adapter: the id the server gives a model on
   its publish. A model is immutable and the server keeps it. So an id names
   one text for as long as the store lives, and a decision names that id as
-  the version it ran under. `docs/events.md` §4 has the table of what the
-  event carries.
+  the version it ran under. `docs/events.md` under "Policy version" has
+  what the event carries.
 
   The content is the model text the binding names. The version carries it
   by value under the cap, and as a pointer to the file above it. The

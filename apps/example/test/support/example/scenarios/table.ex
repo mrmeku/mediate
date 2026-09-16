@@ -1,6 +1,6 @@
 defmodule Example.Scenarios.Table do
   @moduledoc """
-  The scenario table of `docs/example.md` §4 as data. The freeze test holds
+  The scenario table of `docs/example.md` under "The scenarios" as data. The freeze test holds
   this module to the document row for row. The `scenario` macro validates
   every declaration against it, and the count test reads its size. A row
   changes in the document and here in one commit.

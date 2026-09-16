@@ -1,7 +1,7 @@
 defmodule ExampleRbac.Infrastructure.Policy do
   @moduledoc """
   The example's rules as a role table and, per protected schema, the grants
-  and predicates. `docs/example.md` §3 states the rules.
+  and predicates. `docs/example.md` states the rules.
 
   The grants:
 
@@ -17,7 +17,7 @@ defmodule ExampleRbac.Infrastructure.Policy do
   - `:another_approver` is C9
   """
 
-  use Mediate.Rbac.Policy, version: "2026.09.1", author: "example_rbac", approval: "docs/example.md §3"
+  use Mediate.Rbac.Policy, version: "2026.09.1", author: "example_rbac", approval: "the rules in docs/example.md"
 
   alias Example.Domain.Assignment
   alias Example.Domain.Document

@@ -84,7 +84,7 @@ defmodule Mediate.Conformance.RepoCase do
   ]
 
   @doc """
-  The guarantee table of `docs/conformance.md` §5 as data, one id and one
+  The guarantee table of `docs/conformance.md` under "The guarantees" as data, one id and one
   sentence per row. The freeze test in `mediate` holds it to the document
   row for row.
   """

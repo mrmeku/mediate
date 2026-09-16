@@ -3,7 +3,7 @@ defmodule ExamplePostgres.CoverageTest do
   Declared-fact coverage over the CUI policies: every column the policies of
   this binding read is a declared fact of the example.
   `Mediate.Postgres.Coverage` says how the check reads the policies back,
-  and `docs/conformance.md` §2 names it `au12-07`.
+  and `docs/conformance.md` names it `au12-07`.
   """
 
   use ExUnit.Case, async: true

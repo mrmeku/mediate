@@ -9,8 +9,8 @@ defmodule Mediate.Fga.Conformance do
   - what those templates run under
 
   The model the tuples sit under is `priv/conformance/model.fga`, which is
-  what the server reads. `docs/conformance.md` §3 says what each adapter's
-  test support holds. The test run compiles these. An application never
+  what the server reads. `Mediate.Conformance.World` says what the
+  fixture is. The test run compiles these. An application never
   loads them.
   """
 

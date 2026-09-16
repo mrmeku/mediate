@@ -1,6 +1,6 @@
 defmodule ExampleCerbos.CoverageTest do
   @moduledoc """
-  Declared-fact coverage (`docs/conformance.md` §2) over the CUI policies:
+  Declared-fact coverage, `au12-07` in `docs/conformance.md`, over the CUI policies:
   every column the rules of this binding read is a declared fact of the
   example.
 

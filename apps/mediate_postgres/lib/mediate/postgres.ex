@@ -6,7 +6,7 @@ defmodule Mediate.Postgres do
   Migrations write the policies. The database enforces them on every
   statement, with the statements this library never sees among them. The
   configuration entry is the bare module, because the adapter takes no
-  options (`docs/design.md` §7). The adapter finds the repo and the schemas
+  options (`Mediate.Config`). The adapter finds the repo and the schemas
   through the binding that `Mediate.Postgres.Binding.bind/1` makes at boot.
 
   Three mechanisms.
@@ -32,7 +32,7 @@ defmodule Mediate.Postgres do
   *Policy versions.* The version is the migration number.
   `Mediate.Postgres.Migration.publish!/2` reads the policies back from
   `pg_policy` and emits the version in the same transaction as the DDL.
-  `docs/events.md` §4 has the event.
+  `docs/events.md` under "Policy version" has the event.
 
   The database does not report which policy admitted a row, so an answer
   names the policy of the operation and nothing further. The adapter

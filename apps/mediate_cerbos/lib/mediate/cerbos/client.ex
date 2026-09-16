@@ -14,8 +14,7 @@ defmodule Mediate.Cerbos.Client do
   body, or fails with a sentence that names what went wrong. That sentence
   becomes the detail of the engine error, which the denial carries.
 
-  The event is how a shape test counts the engine's own calls
-  (`docs/contributing.md` §2).
+  The event is how a shape test counts the engine's own calls.
   """
 
   @connect_timeout 1_000

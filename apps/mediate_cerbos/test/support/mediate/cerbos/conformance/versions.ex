@@ -6,8 +6,8 @@ defmodule Mediate.Cerbos.Conformance.Versions do
   and publishes it. `restore/0` puts the boot policy back, binds the boot
   commit, and asks the sidecar until the boot policy answers again. The
   sidecar watches its policy directory, so a swap is in force once the
-  sidecar has read the file. That is the propagation the laws measure
-  (`docs/conformance.md` §4).
+  sidecar has read the file. That is the propagation the laws measure.
+  `Mediate.Conformance.Versions` says what this module owes the suite.
   """
 
   @behaviour Mediate.Conformance.Versions

@@ -3,7 +3,6 @@ defmodule Example.Infrastructure.Ocsf do
   # Hidden, because the format a security log takes is the consumer's and
   # not this package's surface. What is here is the mapping from the
   # library's three events to OCSF records, against schema version 1.3.0.
-  # `docs/events.md` §6 has the table.
   #
   # The library carries what an event means, and this module carries the
   # format. The

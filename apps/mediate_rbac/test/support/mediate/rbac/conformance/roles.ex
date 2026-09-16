@@ -1,6 +1,6 @@
 defmodule Mediate.Rbac.Conformance.Roles do
   @moduledoc """
-  The fixture's rule (`docs/conformance.md` §3) as a role table. A reader
+  The fixture's rule (`Mediate.Conformance.World`) as a role table. A reader
   can read, and an editor can read and edit. A folder grants the role its
   memberships hold. An item grants the role its folder's memberships hold.
   Every allowed subject holds the clearance, and the membership the grant

@@ -1,6 +1,6 @@
 defmodule Mediate.Conformance.Law do
   @moduledoc """
-  The law table of `docs/conformance.md` §2 as data. Each row has an id, a
+  The law table of `docs/conformance.md` under "The laws" as data. Each row has an id, a
   sentence, and the controls it answers. `Mediate.Conformance.AdapterCase`
   names each test from a row here. The freeze test in `mediate` holds this
   table to the document row for row, so a change to one needs a commit

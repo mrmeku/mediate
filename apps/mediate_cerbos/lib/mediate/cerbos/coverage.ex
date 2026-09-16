@@ -1,7 +1,7 @@
 defmodule Mediate.Cerbos.Coverage do
   @moduledoc """
   Declared-fact coverage for a compiled query plan: every column the query
-  reads is a declared fact. `docs/conformance.md` §2 names this check as
+  reads is a declared fact. `docs/conformance.md` under "The laws" names this check as
   `au12-07`.
 
   A plan comes from the sidecar and becomes a query here. This is the one

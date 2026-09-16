@@ -1,6 +1,5 @@
 # Credo 1.7.19. Every check the release ships is on, unless a comment
-# beside it says why not. docs/contributing.md §3 names the checks that are
-# off by default and on here. The two checks of `mediate_credo` close the
+# beside it says why not. The two checks of `mediate_credo` close the
 # list. Every application takes that package as a dev and test dependency.
 # So a run from an application's own directory finds them, as a run from
 # the root does.
@@ -151,8 +150,8 @@
           # A count of module dependencies does not describe a boundary.
           # Boundary does.
           {Credo.Check.Refactor.ModuleDependencies, []},
-          # docs/contributing.md §3 asks for `opts = validate(opts)`, which
-          # rebinds a name after a validation step.
+          # `opts = validate(opts)` rebinds a name after a validation step,
+          # and the review asks for that shape.
           {Credo.Check.Refactor.VariableRebinding, []}
         ]
       }

@@ -18,8 +18,8 @@ defmodule Mediate.Cerbos.Propagation do
   deadline is generous, because a directory watch is not instant.
 
   Nothing here asserts a number. The measurement comes back as a struct of
-  milliseconds, for the caller to record. `docs/conformance.md` §2 says how
-  the laws print it.
+  milliseconds, for the caller to record. The latency laws print it and
+  never assert it.
   """
 
   @interval 10

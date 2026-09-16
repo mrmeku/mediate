@@ -1,7 +1,7 @@
 defmodule Mediate.Fga.Seed do
   @moduledoc """
   How the conformance template makes this adapter's store agree with a
-  world. `docs/conformance.md` §4 says what a `Seed` module owes the suite.
+  world. `Mediate.Conformance.Seed` says what this module owes the suite.
   The seed marks every object and drains, and does not write what the
   world says. The template writes each world through the seam, so the
   tables carry it already. So the drain is the mechanism under test and

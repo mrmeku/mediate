@@ -1,5 +1,5 @@
-# The example: controlled unclassified information
+# The example
 
-The application that measures every adapter. It is a document store under the marking rules of 32 CFR Part 2002 and the controls of the CUI Registry. `docs/example.md` §3 states its thirteen rules, and `docs/example.md` §4 holds its scenarios. The domain, its contexts, and every scenario live here. A thin application binds one adapter to it and adds only what that adapter needs. This package has no application callback and starts nothing.
+*What is in this package? For someone reading the example.*
 
-The package's own tests cover the contexts under `Mediate.Test.Fake`. The scenarios run in each thin application, under the adapter it binds, and never here. `Example` and the moduledocs say what each module does.
+The controlled-unclassified-information domain that measures every adapter: the schemas, the contexts, the consumer that maps the events to OCSF, and the scenarios. `docs/example.md` has the rules and the scenario table. No module here names an adapter, and the scenarios run in each thin application, never here. The `Example` moduledoc names the places.

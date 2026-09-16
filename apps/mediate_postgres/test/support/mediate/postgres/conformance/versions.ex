@@ -1,7 +1,7 @@
 defmodule Mediate.Postgres.Conformance.Versions do
   @moduledoc """
   The change-management artifact of row-level security.
-  `docs/conformance.md` §4 has the callbacks.
+  `Mediate.Conformance.Versions` has the callbacks.
 
   `tighten/0` drops the folders' read policy through the owner repo and
   writes one that admits a reader's membership alone. It records a

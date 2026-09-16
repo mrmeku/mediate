@@ -6,7 +6,7 @@ defmodule Mediate.Rbac.Version do
   So a change to a rule is a new version whether or not anyone said so. The
   content is the role table and the module list as text when under the
   configured cap, and a pointer to the modules otherwise. `docs/events.md`
-  §4 has the event and the cap.
+  under "Policy version" has the event and the cap.
 
   `Mediate.Rbac.publish/0` builds the version and emits `telemetry_event/0`
   with it, one event per call. It stores nothing, so the consumer that

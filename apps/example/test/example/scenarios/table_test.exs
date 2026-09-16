@@ -1,7 +1,7 @@
 defmodule Example.Scenarios.TableTest do
   @moduledoc """
   The frozen scenario table. A change here follows a change to
-  `docs/example.md` §4 in its own commit.
+  `docs/example.md` under "The scenarios" in its own commit.
   """
 
   use ExUnit.Case, async: true
@@ -24,7 +24,7 @@ defmodule Example.Scenarios.TableTest do
                Enum.map(1..3, &"ovr-#{pad(&1)}")
   end
 
-  test "the scenario table equals docs/example.md §4" do
+  test "the scenario table equals docs/example.md under The scenarios" do
     assert Table.all() == reference_rows()
   end
 
@@ -40,7 +40,7 @@ defmodule Example.Scenarios.TableTest do
   defp reference_rows do
     @reference
     |> File.read!()
-    |> String.split("\n## 4. The scenarios")
+    |> String.split("\n## The scenarios")
     |> Enum.at(1)
     |> String.split("\n## ")
     |> hd()

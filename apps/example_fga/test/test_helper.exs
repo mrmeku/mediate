@@ -2,7 +2,7 @@ alias Ecto.Adapters.SQL.Sandbox
 alias Example.Infrastructure.Repo
 
 # The cluster, the migrations loaded once, and both repos on one database:
-# `docs/contributing.md` §2 has the rules.
+# `Mediate.Dev.Cluster` says what the cluster does.
 migrations =
   for file <- Enum.sort(Path.wildcard("priv/repo/migrations/*.exs")) do
     [{module, _binary}] = Code.require_file(file)

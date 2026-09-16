@@ -4,7 +4,7 @@ defmodule Mediate.Cerbos do
   host answers from them.
 
   The configuration boots with `adapter: {Mediate.Cerbos, address: "127.0.0.1:3592"}`
-  (`docs/design.md` §7). The entry carries the sidecar's `address:` and
+  (`Mediate.Config`). The entry carries the sidecar's `address:` and
   nothing else, because the address is where the process runs. What the
   adapter can read comes from the binding that `Mediate.Cerbos.Binding.bind/1`
   makes at boot. The binding names the mediated repo, the declaration

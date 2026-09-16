@@ -1,7 +1,7 @@
 defmodule Mediate.FreezeTest do
   @moduledoc """
-  The frozen lists. A change here follows a change to `docs/design.md` or
-  `docs/conformance.md`, in the same commit.
+  The frozen lists. A change here follows a change to `docs/conformance.md`
+  under "The laws" or "The guarantees", in the same commit.
   """
 
   use ExUnit.Case, async: true
@@ -50,12 +50,12 @@ defmodule Mediate.FreezeTest do
                 unsupported invalid unmediated)a
   end
 
-  test "the law table equals docs/conformance.md §2" do
-    assert Law.all() == Enum.map(rows("\n## 2. The laws"), &law/1)
+  test "the law table equals docs/conformance.md under The laws" do
+    assert Law.all() == Enum.map(rows("\n## The laws"), &law/1)
   end
 
-  test "the guarantee table equals docs/conformance.md §5" do
-    assert RepoCase.guarantees() == Enum.map(rows("\n## 5. The repo case"), &guarantee/1)
+  test "the guarantee table equals docs/conformance.md under The guarantees" do
+    assert RepoCase.guarantees() == Enum.map(rows("\n## The guarantees"), &guarantee/1)
   end
 
   defp fields(module) do

@@ -5,7 +5,8 @@ defmodule Mediate.Postgres.Version do
   A migration that changes a policy appends its own version in the same
   transaction as its DDL. So the rules and the record of what they became
   commit together or not at all, and a decision after it names that
-  number. `docs/events.md` §4 has the event and what it carries.
+  number. `docs/events.md` under "Policy version" has the event and what
+  it carries.
 
   The content is the policies as `pg_policy` renders them. A version
   carries it by value under the cap the caller gives, and as a pointer to

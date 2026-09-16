@@ -1,7 +1,7 @@
 defmodule Mediate.Rbac.Conformance.Versions do
   @moduledoc """
-  The change-management artifact of RBAC in code (`docs/conformance.md`
-  §4). `tighten/0` binds `Mediate.Rbac.Conformance.Tightened` in place of
+  The change-management artifact of RBAC in code
+  (`Mediate.Conformance.Versions`). `tighten/0` binds `Mediate.Rbac.Conformance.Tightened` in place of
   the boot role table and publishes it. `restore/0` binds the boot table
   again. A policy in code is in force the moment the adapter binds it, so
   neither waits.

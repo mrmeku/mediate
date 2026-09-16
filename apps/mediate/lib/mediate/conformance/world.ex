@@ -10,8 +10,7 @@ defmodule Mediate.Conformance.World do
 
   A population is a struct of the module that implements this behaviour.
   So a law that gets one reaches the module through the struct and carries
-  no second argument. `module/1` is that step. `docs/conformance.md` §3
-  has the callback table.
+  no second argument. `module/1` is that step.
   """
 
   @typedoc "A population: a struct of the module that implements this behaviour."

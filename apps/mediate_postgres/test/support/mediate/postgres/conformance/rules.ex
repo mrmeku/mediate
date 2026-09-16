@@ -1,6 +1,6 @@
 defmodule Mediate.Postgres.Conformance.Rules do
   @moduledoc """
-  The fixture's rule as policies. `docs/conformance.md` §3 has the rule.
+  The fixture's rule as policies. `Mediate.Conformance.World` has the rule.
 
   The read policy of a folder is a live membership on it, held by the kind
   that asks, on a cleared account. The edit policy adds the editor role.

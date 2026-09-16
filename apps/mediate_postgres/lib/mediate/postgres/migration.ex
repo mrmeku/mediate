@@ -31,7 +31,7 @@ defmodule Mediate.Postgres.Migration do
     the table at all, and the two go together.
   - `publish!/2` reads the policies back from `pg_policy` and emits the
     policy version, in the transaction the migration is already in.
-    `docs/events.md` §4 has the event.
+    `docs/events.md` under "Policy version" has the event.
 
   Every name a helper puts into a statement passes a check first. A name
   that passes is a plain lowercase identifier within the length an

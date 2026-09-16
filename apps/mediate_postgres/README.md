@@ -1,6 +1,20 @@
 # Mediate on row-level security
 
-`Mediate.Postgres` is the adapter whose rules are Postgres policies on the tables themselves. The database enforces a policy on every statement, with the statements this library never sees among them. So the rules hold for a report tool, a console session, and a migration alike. A migration is a policy version, revocation is one commit, and the boundary cost is nothing new. The moduledoc of `Mediate.Postgres` has the mechanism.
+*How do I bind this adapter, and what mechanism answers each rule shape? For an adopter whose rules are Postgres policies.*
+
+`Mediate.Postgres` decides from policies on the tables themselves. The database enforces a policy on every statement, the statements this library never sees among them, so the rules hold for a report tool and a console session alike. A migration is a policy version, and revocation is one commit.
+
+## How to bind
+
+The configuration entry is the bare module, `adapter: Mediate.Postgres`. After the configuration boots, bind the repo and the schemas the policies protect and read. `Mediate.Postgres.Binding` has the options. The adapter reads the catalog on first use, and the `Mediate.Postgres` moduledoc names the function that reads it at boot instead.
+
+```elixir
+{:ok, _binding} = Mediate.Postgres.Binding.bind(repo: MyApp.Repo, schemas: [MyApp.Folder, MyApp.Membership])
+```
+
+## The declarations
+
+A migration declares the policies through the helpers of `Mediate.Postgres.Migration`, whose moduledoc says what each one writes: protect a table, add a scope policy, a gate, an admit, an exempt, a grant, and publish the version. The application's role must carry `NOBYPASSRLS` and must not own the protected tables. A role with `BYPASSRLS` is not subject to the policies, and a table's owner is not either. The protect helper forces row-level security, which closes the owner's way around them.
 
 ## Mechanism per rule shape
 
@@ -12,20 +26,11 @@
 | A rule over a whole type | the scope policy itself. `scope` answers `true`, and the database narrows the query |
 | A row written outside a decision | the permissive `true` policy of that command. A table that takes writes under an exemption needs one under forced row-level security |
 
-## Declarations
+## What this adapter decided
 
-Bind at boot, after the configuration boots with `adapter: Mediate.Postgres`:
+- **Session settings, not a role per subject.** A database role per user was the alternative, and a connection pool cannot switch roles per call.
+- **An operation guard on every scope policy.** One policy per table was the alternative. Permissive policies combine with OR, so an unguarded read policy widens every other operation.
+- **The version is the migration number, and the content is the policy text read back from `pg_policy`.** The migration file was the alternative, and the catalog is what the database enforces.
+- **The version event fires in the migration's transaction.** A publish at boot was the alternative, and then a rule change and its record could commit apart.
 
-```elixir
-{:ok, _binding} = Mediate.Postgres.Binding.bind(repo: MyApp.Repo, schemas: [MyApp.Folder, MyApp.Membership])
-```
-
-Then call `Mediate.Postgres.load!/0` to read the catalog at boot. A binding that skips the call reads it on first use.
-
-A migration declares the policies through `Mediate.Postgres.Migration`: `protect!/2`, `policy!/2`, `gate!/2`, `admit!/2`, `exempt!/2`, `grant!/2`, and `publish!/2`. Its moduledoc says what each one writes.
-
-The application's role must carry `NOBYPASSRLS` and must not own the protected tables. A role with `BYPASSRLS` is not subject to the policies, and a table's owner is not either. `protect!/2` forces row-level security, which closes the owner's way around them. The role's own definition closes the other.
-
-## Latency
-
-Revocation latency has one component, commit. Every statement goes to the primary, so the adapter reports replica lag as not measured. A rule change propagates with the migration that carries it, in the same transaction as its DDL. The conformance suite prints both measurements and asserts nothing about them (`docs/conformance.md` §2).
+Revocation latency has one component, commit, because every statement goes to the primary. A rule change propagates with the migration that carries it.

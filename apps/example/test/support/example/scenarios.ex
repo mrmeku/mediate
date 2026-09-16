@@ -1,6 +1,6 @@
 defmodule Example.Scenarios do
   @moduledoc """
-  Every scenario of the table in `docs/example.md` §4, declared once here.
+  Every scenario of the table in `docs/example.md` under "The scenarios", declared once here.
   `use Example.Scenarios` defines them in a thin application's test module.
   The adapter comes from the thin application's boot configuration, not from
   the test.

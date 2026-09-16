@@ -1,8 +1,8 @@
 defmodule Mediate.Cerbos.Version do
   @moduledoc """
   The policy version of a sidecar: the commit of the repository the policy
-  files are in, which the binding names. `docs/events.md` §4 has the event
-  and what it carries.
+  files are in, which the binding names. `docs/events.md` under "Policy
+  version" has the event and what it carries.
 
   The identifier is not a digest of the files, and it is not the `version`
   field inside a policy. That field runs variants of a policy side by side.
@@ -18,7 +18,7 @@ defmodule Mediate.Cerbos.Version do
 
   `Mediate.Cerbos.publish/0` builds the version and emits
   `[:mediate, :cerbos, :policy_version]` with it, once per call. The
-  library stores nothing (`docs/design.md` §1), so the consumer that
+  library stores nothing, so the consumer that
   handles the event keeps the record of what a deploy put in force.
   """
 

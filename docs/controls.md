@@ -1,18 +1,12 @@
-# Requirements
+# Controls
 
-*The requirement lines that reach this library, where each comes from, and what answers it. One row per applicable line. A person maintains it, and no code reads it.*
+*Which NIST line does each law, guarantee, and scenario answer? For an assessor.*
 
-## 1. Source
+The lines are NIST SP 800-53 Rev 5 controls as the FedRAMP Rev 5 Moderate baseline selects and parameterizes them. The selections and parameter values come from the OSCAL profile `FedRAMP_rev5_MODERATE-baseline_profile.json`, read on 2026-09-14 in the oscal-compass-lab mirror of GSA's fedramp-automation repository. The control text comes from the csf.tools mirror of the Rev 5 catalog. A control cited with an asterisk in `docs/example.md` is outside the baseline, and no control in the baseline asks for a reference monitor.
 
-NIST SP 800-53 Rev 5, as the FedRAMP Rev 5 Moderate baseline selects and parameterizes it. A control is one numbered requirement of the catalog, and an enhancement is a numbered part of one, such as AC-2(4). The baseline is the set of controls FedRAMP selects for one impact level. An organization-defined parameter, ODP, is a value the baseline fills into a control's text.
+A law is a row of `docs/conformance.md` under "The laws", and a guarantee is a row under "The guarantees". A scenario is a row of `docs/example.md` under "The scenarios".
 
-The selections and parameter values below come from the OSCAL profile `FedRAMP_rev5_MODERATE-baseline_profile.json`, read on 2026-09-14 in the oscal-compass-lab mirror of GSA's fedramp-automation repository. The control text comes from the csf.tools mirror of the Rev 5 catalog. FedRAMP 20x key security indicators are a cross-reference and not a source.
-
-**Selected in the Moderate baseline**, of the controls this repository cites: AC-2, AC-2(1), AC-2(2), AC-2(3), AC-2(4), AC-2(5), AC-2(7), AC-2(9), AC-2(12), AC-2(13), AC-3, AC-5, AC-6, AC-6(1), AC-6(2), AC-6(5), AC-6(7), AC-6(9), AC-6(10), AU-2, AU-3, AU-3(1), AU-6, AU-6(1), AU-6(3), AU-9, AU-9(4), AU-11, AU-12, CM-3, CM-3(2), CM-3(4), CM-5, CM-5(1), CM-5(5), IA-11, PS-4, PS-5.
-
-**In no baseline**, and cited by nothing here: AC-3(7), AC-3(8), AC-16, AC-25. No control in the baseline asks for a reference monitor, and this library does not claim one.
-
-**Parameters that bind the library.**
+## The parameters
 
 | Parameter | Value | What it means here |
 |---|---|---|
@@ -21,9 +15,7 @@ The selections and parameter values below come from the OSCAL profile `FedRAMP_r
 | AC-2(4) | "Automatically audit account creation, modification, enabling, disabling, and removal actions" | a single-row write to a schema audited as `:user` emits one change event |
 | AC-6(9) | "Log the execution of privileged functions" | every decision for a `:privileged` subject carries that kind |
 
-## 2. The table
-
-A law is a Tier 1 conformance test in `Mediate.Conformance.AdapterCase`. Every adapter runs it against its real engine, and `docs/conformance.md` §2 carries the frozen list with each law's sentence. `Mediate.Conformance.RepoCase` asserts a guarantee `E1` to `E5` against a repo, and `docs/conformance.md` §5 carries those. A scenario id names a row of the example's table in `docs/example.md` §4. A scenario shows a domain rule and asserts nothing neutral. The vocabulary of a law is the neutral fixture's: subject `{kind, id}`, object `{type, id}`, operation, grant (a membership row), fact (clearance, role, expiry, kind), decision, event.
+## The controls
 
 | Control | Answered by |
 |---|---|
@@ -62,9 +54,9 @@ A law is a Tier 1 conformance test in `Mediate.Conformance.AdapterCase`. Every a
 | IA-11 | `ia-01` to `ia-03`, re-authentication in the example |
 | AC-6(9), AU-6 | `ovr-01` to `ovr-03`, the audited override in the example |
 
-## 3. The consumer's lines
+## The consumer's lines
 
-The library emits what these need. The deployer's system, the consumer that attaches to the events, satisfies them.
+The library emits what these need, and the deployer's consumer satisfies them.
 
 | Control | What the consumer does |
 |---|---|
@@ -75,6 +67,4 @@ The library emits what these need. The deployer's system, the consumer that atta
 | CM-3(4), CM-5(5) | Puts a security representative on the change board and limits who can publish a version |
 | AU-5 | Alerts on a handler failure, which telemetry reports as its own event |
 
-## 4. What keeps a row honest
-
-A row is complete when its control line has a law, a guarantee, an example scenario, or a stated consumer responsibility. Every law id here exists in `Mediate.Conformance.Law.all/0`, which the freeze test holds to `docs/conformance.md`. Check a control number against the catalog before you publish this file. A row that cites a control outside the baseline is a review failure.
+A row is complete when it names a law, a guarantee, a scenario, or a consumer responsibility, and the freeze test holds the law ids.

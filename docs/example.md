@@ -1,41 +1,10 @@
 # The example
 
-*The CUI domain the four thin applications share, its thirteen rules, and the scenario table every binding runs. This document shows how an application expresses its needs through the port under each adapter. `docs/conformance.md` holds what the suite asserts about the port itself.*
+*What does the example domain protect, and which scenarios prove it? For someone reading or extending the example.*
 
-## 1. The domain
+## The domain
 
-Controlled unclassified information, CUI, is information that law protects below the classified level. A document carries a marking. The marking has the categories that say what the information is, and the dissemination controls that say who cannot receive it. An agency designates a document through one of its offices. A program gives its members a lawful purpose to read the document. A designator in the designating office is the person who can change its marking.
-
-| Term | Meaning |
-|---|---|
-| Document | The protected record: a title, a designating office, a program, a decontrol date, a marking, portions, and proposals |
-| Portion | One part of a document, with a marking of its own. The redacted read returns the portions the subject can read |
-| Marking | The categories, the controls, and the releasable-to list that a portion carries and that a document's banner combines |
-| Banner | A document's marking. It admits no subject that a portion of the document denies, and the domain keeps it at write time (C4) |
-| Control | One dissemination control: `federal_only`, `no_foreign`, `named_list`, or `releasable_to`. Each is a test on the subject (C2) |
-| Category | A CUI category. A specified category implies controls that count as declared (C3) |
-| Decontrol | The date after which C2 to C4 no longer apply to a document. C1 still applies (C5) |
-| Named list | The users a marking names directly. Membership grants nothing beyond C1 (C6) |
-| Program | The unit an assignment belongs to. An open program gives lawful purpose to its members (C1) |
-| Assignment | A user's role in a program: `member` or `lead` |
-| Office role | A user's role in an office: `designator` or `approver` (C7, C9) |
-| Designating office | The office that designated a document. It receives the document's override reports |
-| Designating agency | The agency the designating office belongs to |
-| Proposal | A marking change that one designator proposes and a different approver approves (C9) |
-| Override | A privileged read outside C1, with a justification, its own event, and a report (C10) |
-| Privileged account | An account of kind `:privileged`, separate from the person's user account, that can hold the override permission |
-| Re-authentication | The `reauthenticated_at` fact the identity layer supplies |
-| Window | How recent the re-authentication must be for a C7 operation (C8). It is the organization's IA-11 parameter |
-| Redacted read | The document without the portions the subject cannot read |
-| SIEM | The consumer of the library's three events. It holds one OCSF record per decision, change, and access in memory |
-| Access review | The report of who can do what on each agency's documents, and of every privileged account |
-| Fixture | The world every scenario starts from: two agencies, offices, programs, categories, and one account per role |
-| Scenario | One row of §4. A thin application's test module defines it with `use Example.Scenarios` |
-| Thin application | The binding of this domain to one adapter: `example_rbac`, `example_postgres`, `example_cerbos`, or `example_fga` |
-
-## 2. Dissemination controls and the portion
-
-A category says what the information is. A control says who cannot receive it, below the default that anyone with a lawful government purpose can. The Registry allows a fixed set of controls. A document can carry several, and all of them must hold. The example models four, one per shape of subject test. FEDCON, NOCON, DISPLAY ONLY, and the attorney markings are the same shapes with other values.
+Controlled unclassified information, CUI, is information that law protects below the classified level. A document carries a marking: the categories that say what the information is, and the dissemination controls that say who cannot receive it. An agency designates a document through one of its offices, and a program gives its members a lawful purpose to read it. A designator in the designating office can change the marking, and a different approver approves the change. The example models four controls, one per shape of subject test.
 
 | Control | Registry marking | Test on the subject |
 |---|---|---|
@@ -44,26 +13,9 @@ A category says what the information is. A control says who cannot receive it, b
 | `named_list` | DL ONLY | the subject is on the marking's list, a per-object grant |
 | `releasable_to` | REL TO | nationality is in the marking's country list |
 
-**The portion.** `Portion(document_id, marking: Marking)` is a row under `Document`, and a document can have no portions. The document's marking is its banner, the marking under which a subject can read every one of its portions. Rule C4 says so, and the domain enforces it at write time. `Portion` declares its own object type and is not a carried relation of `Document`. Its `marking` is a fact field of kind `:object_attribute`.
+A portion is one part of a document with a marking of its own, and a document's marking is its banner, the marking under which a subject can read every portion. A redacted read returns the document without the portions the subject cannot read. `Portion` declares its own object type and is not a carried relation of `Document`, so the redacted read is one document decision, one portion `scope`, and a preload under the portion decision. Scope fidelity then holds at portion level. `Example` and the moduledocs under it have the schemas and the contexts.
 
-A document has two read operations. `read` returns the whole document under the banner. It is one Document decision under C1 and C2 over the banner. `read_redacted` returns the document without the portions the subject cannot read. It takes three steps:
-
-- a Document decision under C1, `authorize(subject, :read_redacted, document)`
-- a Portion `scope`, `scope(subject, :read, Portion)`
-- a preload that applies the scope's `dynamic` to the portions query, `Repo.preload(document, :portions, mediate: portion_decision)`
-
-`Portion` is not carried, so the seam refuses a preload without a decision of its own (`docs/design.md` §4). Scope fidelity, C13, holds at portion level. The portions the read returns are exactly those for which `check(subject, :read, portion)` is true. Each adapter filters portions as rows of their own under a policy of their own:
-
-| Adapter | Portion mechanism |
-|---|---|
-| `mediate_rbac` | a `read` operation on `Portion` whose predicates are the document predicates over the portion's marking |
-| `mediate_postgres` | a second row-level security policy on the `portions` table. Postgres does not consult the `documents` policy for portion rows |
-| `mediate_cerbos` | a `portion` resource kind with its own policy. The adapter answers `scope` over portions with derived markings per portion |
-| `mediate_fga` | a `portion` type with a `document` parent, the control flags on the portion, and `can_read: lawful_purpose from document but not blocked` |
-
-## 3. The rules
-
-The thirteen rules of the example's domain, as a person wrote them. §1 defines the words they use.
+## The rules
 
 | Rule | Statement |
 |---|---|
@@ -81,22 +33,11 @@ The thirteen rules of the example's domain, as a person wrote them. §1 defines 
 | **C12 Revocation clock** | The system enforces a revoked fact within the configured maximum delay. The test records the measured latency beside the configured maximum, and no test asserts it. |
 | **C13 Scope fidelity** | `scope` returns exactly the rows for which `check` is true, for Documents and for Portions. |
 
-**What enforces each rule.** Each thin application's README carries a table of the rules against what enforces each under that binding. That is the engine, the seam, the adapter, or the application's own code. A person writes and keeps that table, and no code reads it. The `scenario` macro tags each test with its scenario id, the rule it tests, and the controls §4 cites for that id. So a control id appears once, in §4, and a run reports from the tags.
+Each thin application's README says which mechanism enforces each rule under its binding.
 
-**Where the adapters differ.**
+## The scenarios
 
-- Write gates without application code: Postgres only. The database refuses a marking change that violates C7 whether or not the application asked. That is a property of Postgres and not a rule, and no scenario tests it.
-- Rules that non-developers own, versioned and tested as an artifact of their own: Cerbos only.
-- What an answer names: Cerbos names the policy it matched, code names the clause, and OpenFGA names the relation. Postgres names the policy of the operation, because the database does not report which policy admitted a row.
-- Derived markings, C3 and C4 through portions: Cerbos plans over the attributes the adapter sends alone. So the derivation lives in the subquery a declaration names and not in the policy. OpenFGA walks them as a tuple-to-userset. Neither copies anything.
-- Request-time facts, C5 and C8: every adapter answers them. Postgres threads them through session settings. OpenFGA takes C5 as a tuple condition with the moment in the check context, and its adapter takes C8 from the environment before the call.
-- OpenFGA alone: C9 is `approver from office but not proposer`, and `scope` is `ListObjects` under a cap. `apps/example_fga/priv/fga/model.fga` has the model, and the `example_fga` README has the tuple mapping.
-
-## 4. The scenarios
-
-`Example.Scenarios.Table` holds this table as data. The freeze test in `example` holds the module to this document row for row. Every row is a test in `Example.Scenarios`, and its name is the sentence. The `scenario` macro writes it, `scenario "enf-01", "<sentence>", rule: :c1 do ... end`, and each of the four thin applications runs it.
-
-The Tests column names the C-rule, or `review` for the scenario that shows the port's review verb. An asterisk marks a citation outside the baseline. No scenario tests the events, the seam, or a policy version, because the laws of `docs/conformance.md` assert those for every adapter.
+`Example.Scenarios.Table` holds this table as data, and the freeze test in `example` holds the module to this document row for row. Every row is a test in `Example.Scenarios`, its name is the sentence, and each of the four thin applications runs it. The Tests column names the rule, or `review` for the scenario that shows the port's review verb. An asterisk marks a citation outside the baseline.
 
 | Id | Sentence | Group | Controls cited | Tests |
 |---|---|---|---|---|
@@ -143,6 +84,9 @@ The Tests column names the C-rule, or `review` for the scenario that shows the p
 | `ovr-02` | The override refuses a call without a justification | emergency override | AC-6(9) | C10 |
 | `ovr-03` | The override never reaches C7, and a privileged user cannot change a marking through it | emergency override | AC-6(9), AC-6(1) | C10, C7 |
 
-## 5. What each binding says
+## What the example decided
 
-Each thin application's README carries two tables: what enforces each rule under that binding, and the translation from this domain's words to the adapter's. A person keeps those tables, and no code reads them.
+- **The portion is its own object type.** A carried relation of the document was the alternative. Then the document's decision would cover every portion, and a redacted read could not filter them.
+- **The banner is kept at write time.** Computing it at read time was the alternative. A stored banner is one row the read policy of every adapter tests, and a write that would widen it fails in the transaction that tried.
+- **The override is a declared exemption with permission, justification, event, and report in the example's code.** A rule in the adapter was the alternative. No adapter should carry a path around its own rule, and the exemption records who took it.
+- **Re-authentication is an environment fact.** A session table the adapters read was the alternative. The identity layer owns the session, and the port stamps the fact on the call.

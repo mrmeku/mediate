@@ -7,7 +7,7 @@ defmodule Mediate.Port do
   publishes it.
 
   Every decision publishes one `[:mediate, :decision]` event.
-  `docs/events.md` §1 has the payload. A decision is a read, so it has no
+  `docs/events.md` under "Decision" has the payload. A decision is a read, so it has no
   transaction. The one measurement is `duration`, in microseconds.
 
   The port denies a subject whose kind it does not know before it asks the
@@ -36,7 +36,7 @@ defmodule Mediate.Port do
   @typedoc "A review's answer per subject: the rule over the object type and the decision it runs under."
   @type reviewed :: %{Mediate.subject() => {Ecto.Query.dynamic_expr(), Decision.t()}}
 
-  @doc "The three subject kinds the port knows, in the order `docs/design.md` lists them."
+  @doc "The three subject kinds the port knows."
   @spec subject_kinds() :: [Mediate.subject_kind()]
   def subject_kinds, do: @kinds
 

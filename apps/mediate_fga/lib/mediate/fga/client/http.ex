@@ -2,8 +2,7 @@ defmodule Mediate.Fga.Client.Http do
   @moduledoc """
   The server over HTTP and JSON: one function per call the behaviour names,
   and one telemetry event per call. The event is how a shape test counts
-  the engine's own calls. `docs/conformance.md` §2 says how a shape test
-  counts.
+  the engine's own calls.
 
   The transport is `httpc`, which OTP ships, and the encoder is Elixir's
   `JSON`. So the server adds no dependency to an application that takes

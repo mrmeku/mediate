@@ -1,6 +1,6 @@
 defmodule ExamplePostgres.Infrastructure.Policies do
   @moduledoc """
-  The example's rules as Postgres policy expressions. `docs/example.md` §3
+  The example's rules as Postgres policy expressions. `docs/example.md`
   states the rules. Each function answers one SQL fragment, and the rules
   migration hands those fragments to `Mediate.Postgres.Migration`. A
   fragment reads every fact from the tables at the moment the statement

@@ -4,8 +4,8 @@ defmodule Mediate.Cerbos.Sidecar do
 
   The run's sidecar serves the conformance policies where they sit in the
   repository, and every test asks it at once. A test that writes a policy
-  cannot use it, because the write changes what another test reads
-  (`docs/contributing.md` §2). So the test gets a directory under `tmp/`,
+  cannot use it, because the write changes what another test reads, and
+  every test owns its state. So the test gets a directory under `tmp/`,
   with a copy of the conformance policies or with policy files of its own.
   A server on that directory stops when the test ends.
   """

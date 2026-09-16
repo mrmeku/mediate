@@ -1,7 +1,7 @@
 defmodule Mediate.Fga.Conformance.Versions do
   @moduledoc """
-  The change-management artifact of the OpenFGA adapter. `docs/conformance.md`
-  §4 says what a `Versions` module owes the suite. `tighten/0`:
+  The change-management artifact of the OpenFGA adapter.
+  `Mediate.Conformance.Versions` says what this module owes the suite. `tighten/0`:
 
   - writes the conformance model with `can_read` narrowed to a reader alone
     to a file of its own

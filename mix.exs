@@ -39,11 +39,12 @@ defmodule Mediate.Umbrella.MixProject do
       extras: [
         "README.md": [title: "Mediate"],
         "docs/design.md": [title: "Design"],
-        "docs/requirements.md": [title: "Requirements"],
+        "docs/controls.md": [title: "Controls"],
         "docs/conformance.md": [title: "Conformance"],
         "docs/events.md": [title: "Events"],
         "docs/example.md": [title: "The example"],
-        "docs/contributing.md": [title: "How to contribute"]
+        "docs/writing.md": [title: "Writing"],
+        "CONTRIBUTING.md": [title: "Contributing"]
       ]
     ]
   end
@@ -59,8 +60,7 @@ defmodule Mediate.Umbrella.MixProject do
     [ignore_advisories: ["CVE-2026-32686"]]
   end
 
-  # docs/contributing.md §5 names the steps. The test step is the `test`
-  # alias, so CI adds `--partitions` through MIX_TEST_PARTITION and needs
+  # The test step is the `test` alias, so CI adds `--partitions` through MIX_TEST_PARTITION and needs
   # no second alias.
   defp aliases do
     [

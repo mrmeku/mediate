@@ -51,21 +51,28 @@ defmodule ExampleCerbos.MixProject do
   # https://hex.pm/api/packages/<name> on 2026-09-09.
   defp deps do
     [
-      {:mediate, in_umbrella: true},
+      {:mediate, sibling(:mediate)},
       {:mediate_dev, in_umbrella: true, only: :test},
       {:example, in_umbrella: true},
-      {:mediate_cerbos, in_umbrella: true},
+      {:mediate_cerbos, sibling(:mediate_cerbos)},
       {:ecto, "3.14.2"},
       {:ecto_sql, "3.14.0"},
       {:postgrex, "0.22.4"},
       {:muontrap, "2.0.0", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
-      {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},
+      {:mediate_credo, sibling(:mediate_credo, only: [:dev, :test], runtime: false)},
       {:styler, "1.12.2", only: [:dev, :test], runtime: false},
       {:ex_doc, "0.40.4", only: [:dev, :test], runtime: false},
       {:mix_audit, "2.1.5", only: [:dev, :test], runtime: false}
     ]
+  end
+
+  defp sibling(app, opts \\ []) do
+    case System.get_env("MEDIATE_PACKAGES") do
+      nil -> Keyword.put(opts, :in_umbrella, true)
+      dir -> Keyword.merge(opts, path: Path.join(dir, to_string(app)), override: true)
+    end
   end
 
   defp docs do

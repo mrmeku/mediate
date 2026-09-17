@@ -74,6 +74,9 @@ defmodule Mediate.Umbrella.MixProject do
         "xref graph --format cycles --fail-above 0",
         "deps.unlock --check-unused",
         "deps.audit --ignore-advisory-ids GHSA-rhv4-8758-jx7v",
+        # The deployable of every published package, and what its metadata
+        # carries. It fetches nothing and starts nothing.
+        "mediate.package --check",
         "docs --warnings-as-errors",
         "test"
       ],

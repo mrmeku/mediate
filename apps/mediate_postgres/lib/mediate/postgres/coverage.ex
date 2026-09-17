@@ -6,8 +6,9 @@ defmodule Mediate.Postgres.Coverage do
   `check/1` reads the policy expressions from `pg_policy` and the columns
   they reference from `pg_depend`, which records one dependency per column
   an expression names. Then it asks the bound schemas whether each of those
-  columns has a declaration. `docs/conformance.md` under "The laws" names this check
-  `au12-07`.
+  columns has a declaration.
+  [the conformance document](https://hexdocs.pm/mediate/conformance.html) under
+  "The laws" names this check `au12-07`.
 
   A column counts as declared in four cases:
 

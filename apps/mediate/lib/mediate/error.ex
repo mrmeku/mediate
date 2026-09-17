@@ -25,6 +25,7 @@ defmodule Mediate.Error do
   @typedoc "Why the call failed. An error never carries `:allowed`."
   @type reason :: Answer.reason() | :unsupported | :invalid | :unmediated
 
+  @typedoc "A failed call: why, and a detail that names what failed."
   @type t :: %__MODULE__{reason: reason(), detail: String.t()}
 
   @doc "The reasons an error carries: a denial's reasons, and the library's own."

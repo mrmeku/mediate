@@ -1,10 +1,16 @@
 defmodule Mediate.Rbac.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/mrmeku/mediate"
+
   def project do
     [
       app: :mediate_rbac,
-      version: "0.1.0",
+      version: @version,
+      description: "RBAC in code for Mediate: an authorization adapter whose rules are Elixir modules.",
+      package: package(),
+      source_url: @source_url,
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -46,24 +52,38 @@ defmodule Mediate.Rbac.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
+  defp package do
+    [
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
+        "Design" => "https://hexdocs.pm/mediate/design.html"
+      }
+    ]
+  end
+
   # lib depends on the library, ecto, and telemetry alone. ecto_sql and
   # postgrex serve the test run, as the conformance package and stream_data
   # do: an adopter of this adapter proves it and does not ship the proof.
-  # Every pin is exact. Versions verified against
-  # https://hex.pm/api/packages/<name> on 2026-09-08.
+  # Each published requirement is compatible rather than exact, so an
+  # adopter already on a later patch can install this package, and mix.lock
+  # holds the version and the checksum this repository builds against.
+  # Versions verified against https://hex.pm/api/packages/<name> on
+  # 2026-09-08.
   defp deps do
     [
-      {:mediate, in_umbrella: true},
+      {:mediate, sibling("~> 0.1")},
       {:mediate_dev, in_umbrella: true, only: :test},
       {:mediate_conformance, in_umbrella: true, only: :test},
-      {:ecto, "3.14.2"},
-      {:nimble_options, "1.1.1"},
-      {:telemetry, "1.4.2"},
-      {:ecto_sql, "3.14.0", only: :test},
-      {:postgrex, "0.22.4", only: :test},
-      {:stream_data, "1.4.0", only: :test},
-      {:boundary, "0.10.4", runtime: false},
-      {:credo, "1.7.19", only: [:dev, :test], runtime: false},
+      {:ecto, "~> 3.14"},
+      {:nimble_options, "~> 1.1"},
+      {:telemetry, "~> 1.4"},
+      {:ecto_sql, "~> 3.14", only: :test},
+      {:postgrex, "~> 0.22", only: :test},
+      {:stream_data, "~> 1.4", only: :test},
+      {:boundary, "~> 0.10", runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},
       {:styler, "1.12.2", only: [:dev, :test], runtime: false},
       {:ex_doc, "0.40.4", only: [:dev, :test], runtime: false},
@@ -71,8 +91,17 @@ defmodule Mediate.Rbac.MixProject do
     ]
   end
 
+  defp sibling(requirement) do
+    if System.get_env("MEDIATE_UMBRELLA"), do: [in_umbrella: true], else: requirement
+  end
+
   defp docs do
-    [main: "readme", extras: ["README.md": [title: "Mediate RBAC in code"]]]
+    [
+      main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
+      extras: ["README.md": [title: "Mediate RBAC in code"]]
+    ]
   end
 
   # CVE-2026-32686 (GHSA-rhv4-8758-jx7v): an unbounded exponent when decimal

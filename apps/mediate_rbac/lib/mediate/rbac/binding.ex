@@ -19,6 +19,7 @@ defmodule Mediate.Rbac.Binding do
   @enforce_keys [:policy, :repo]
   defstruct @enforce_keys
 
+  @typedoc "The bound pair: the policy module, and the repo its rules read through."
   @type t :: %__MODULE__{policy: module(), repo: module()}
 
   @doc "The schema of the binding's options."

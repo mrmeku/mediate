@@ -5,11 +5,11 @@ defmodule Mediate.Change do
   it inside the write's transaction. So a consumer that writes to the same
   repository from its handler joins that transaction.
 
-  `docs/events.md` under "Change" has the payload. The value before a change is the row
-  the caller loaded. A change a second writer made between the load and the
-  write is not in the event. The library publishes the event and stores
-  nothing. What an attached handler does with it is the handler's own
-  business.
+  [Events](events.html) under "Change" has the payload. The value before a
+  change is the row the caller loaded. A change a second writer made between
+  the load and the write is not in the event. The library publishes the
+  event and stores nothing. What an attached handler does with it is the
+  handler's own business.
   """
 
   alias Mediate.Schema

@@ -32,7 +32,8 @@ defmodule StructureTest do
   the effect rule and no dependency list does.
 
   `@exceptions` names each file that cannot follow the path rule, with its
-  reason. `CONTRIBUTING.md` under "Where a module goes" states the rules.
+  reason. `Mediate.Dev.Package.published/0` names the published packages.
+  `CONTRIBUTING.md` under "Where a module goes" states the rules.
   """
 
   use ExUnit.Case, async: true
@@ -40,7 +41,9 @@ defmodule StructureTest do
   @umbrella Path.expand("../../..", __DIR__)
 
   # The packages that ship to Hex, whose interior is not their interface.
-  @published ~w(mediate mediate_conformance mediate_rbac mediate_postgres mediate_cerbos mediate_fga)
+  # `Mediate.Dev.Package` holds the list, because `mix mediate.package`
+  # builds the same set. One list, read twice.
+  @published Enum.map(Mediate.Dev.Package.published(), &to_string/1)
 
   @exceptions %{
     "apps/example/lib/example/domain/repository.ex" =>

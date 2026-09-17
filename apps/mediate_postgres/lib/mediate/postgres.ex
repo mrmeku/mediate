@@ -32,7 +32,8 @@ defmodule Mediate.Postgres do
   *Policy versions.* The version is the migration number.
   `Mediate.Postgres.Migration.publish!/2` reads the policies back from
   `pg_policy` and emits the version in the same transaction as the DDL.
-  `docs/events.md` under "Policy version" has the event.
+  [the events document](https://hexdocs.pm/mediate/events.html) under
+  "Policy version" has the event.
 
   The database does not report which policy admitted a row, so an answer
   names the policy of the operation and nothing further. The adapter

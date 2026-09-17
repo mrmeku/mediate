@@ -1,10 +1,16 @@
 defmodule Mediate.Conformance.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/mrmeku/mediate"
+
   def project do
     [
       app: :mediate_conformance,
-      version: "0.1.0",
+      version: @version,
+      description: "The suites that hold a Mediate adapter and a mediated repo to the conformance laws.",
+      package: package(),
+      source_url: @source_url,
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -33,23 +39,36 @@ defmodule Mediate.Conformance.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
+  defp package do
+    [
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
+        "Design" => "https://hexdocs.pm/mediate/design.html"
+      }
+    ]
+  end
+
   # The templates ship in lib, so an adopter's suite draws a population from
   # them. stream_data carries no `only:` for that reason, and telemetry is
   # here because the audit laws attach a handler. ecto_sql and postgrex
-  # serve this package's own run of the repo template. Every pin is exact.
-  # Versions verified against https://hex.pm/api/packages/<name> on
-  # 2026-09-08.
+  # serve this package's own run of the repo template. Each published
+  # requirement is compatible rather than exact, so an adopter already on a
+  # later patch can install this package, and mix.lock holds the version and
+  # the checksum this repository builds against. Versions verified against
+  # https://hex.pm/api/packages/<name> on 2026-09-08.
   defp deps do
     [
-      {:mediate, in_umbrella: true},
+      {:mediate, sibling("~> 0.1")},
       {:mediate_dev, in_umbrella: true, only: :test},
-      {:ecto, "3.14.2"},
-      {:telemetry, "1.4.2"},
-      {:stream_data, "1.4.0"},
-      {:ecto_sql, "3.14.0", only: :test},
-      {:postgrex, "0.22.4", only: :test},
-      {:boundary, "0.10.4", runtime: false},
-      {:credo, "1.7.19", only: [:dev, :test], runtime: false},
+      {:ecto, "~> 3.14"},
+      {:telemetry, "~> 1.4"},
+      {:stream_data, "~> 1.4"},
+      {:ecto_sql, "~> 3.14", only: :test},
+      {:postgrex, "~> 0.22", only: :test},
+      {:boundary, "~> 0.10", runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},
       {:styler, "1.12.2", only: [:dev, :test], runtime: false},
       {:ex_doc, "0.40.4", only: [:dev, :test], runtime: false},
@@ -57,8 +76,17 @@ defmodule Mediate.Conformance.MixProject do
     ]
   end
 
+  defp sibling(requirement) do
+    if System.get_env("MEDIATE_UMBRELLA"), do: [in_umbrella: true], else: requirement
+  end
+
   defp docs do
-    [main: "readme", extras: ["README.md": [title: "Mediate conformance"]]]
+    [
+      main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
+      extras: ["README.md": [title: "Mediate conformance"]]
+    ]
   end
 
   # CVE-2026-32686 (GHSA-rhv4-8758-jx7v): an unbounded exponent when decimal

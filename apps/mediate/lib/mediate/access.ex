@@ -7,8 +7,8 @@ defmodule Mediate.Access do
   Only a read that carried a decision publishes. An exempt read, a read
   through the owner-role repo, and a raw query publish nothing.
 
-  `docs/events.md` under "Access" has the payload. The one measurement is `count`. The
-  library publishes the event and stores nothing.
+  [Events](events.html) under "Access" has the payload. The one measurement
+  is `count`. The library publishes the event and stores nothing.
   """
 
   alias Mediate.Decision

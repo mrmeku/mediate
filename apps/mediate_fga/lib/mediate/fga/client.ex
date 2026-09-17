@@ -47,6 +47,7 @@ defmodule Mediate.Fga.Client do
   @typedoc "The id of a published model."
   @type model :: String.t()
 
+  @typedoc "What a callback returns when the server refuses or cannot be reached."
   @type failure :: {:error, Error.t()}
 
   @doc "Creates a store of the given name and answers the id the server gave it."

@@ -23,7 +23,9 @@ defmodule Mediate.Adapter do
   alias Mediate.Decision
   alias Mediate.Error
 
+  @typedoc "The options the port hands the adapter, unchanged."
   @type options :: keyword()
+  @typedoc "What a callback returns when it cannot answer."
   @type failure :: {:error, Error.t()}
 
   @typedoc "What `scope/5` answers: the rule as a dynamic, and the answer that goes with it."

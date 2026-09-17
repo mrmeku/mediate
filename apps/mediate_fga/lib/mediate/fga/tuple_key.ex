@@ -22,6 +22,7 @@ defmodule Mediate.Fga.TupleKey do
   @typedoc "A tuple's key: its user, its relation, and its object."
   @type key :: {String.t(), String.t(), String.t()}
 
+  @typedoc "One tuple: its key, and the condition it carries."
   @type t :: %__MODULE__{
           user: String.t(),
           relation: String.t(),

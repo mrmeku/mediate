@@ -7,8 +7,9 @@ defmodule Mediate.Port do
   publishes it.
 
   Every decision publishes one `[:mediate, :decision]` event.
-  `docs/events.md` under "Decision" has the payload. A decision is a read, so it has no
-  transaction. The one measurement is `duration`, in microseconds.
+  [Events](events.html) under "Decision" has the payload. A decision is a
+  read, so it has no transaction. The one measurement is `duration`, in
+  microseconds.
 
   The port denies a subject whose kind it does not know before it asks the
   adapter. The event of that denial says `:unknown` as the kind.

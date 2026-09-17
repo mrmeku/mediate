@@ -53,6 +53,7 @@ defmodule Mediate.Fga.Binding do
   @enforce_keys [:repo, :model, :mapping]
   defstruct [:repo, :model, :mapping, :guard, :author, :approval]
 
+  @typedoc "The bound repo, the model file, the tuple mapping, and the guard."
   @type t :: %__MODULE__{
           repo: module(),
           model: Path.t(),

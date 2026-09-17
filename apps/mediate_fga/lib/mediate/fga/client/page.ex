@@ -10,5 +10,6 @@ defmodule Mediate.Fga.Client.Page do
   @enforce_keys [:tuples, :continuation]
   defstruct @enforce_keys
 
+  @typedoc "One page of tuples, and what to ask for the next."
   @type t :: %__MODULE__{tuples: [TupleKey.t()], continuation: String.t() | nil}
 end

@@ -1,10 +1,16 @@
 defmodule Mediate.Credo.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/mrmeku/mediate"
+
   def project do
     [
       app: :mediate_credo,
-      version: "0.1.0",
+      version: @version,
+      description: "Two Credo checks that find the two ways an Ecto query leaves the Mediate seam.",
+      package: package(),
+      source_url: @source_url,
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -30,18 +36,34 @@ defmodule Mediate.Credo.MixProject do
     [extra_applications: [:logger]]
   end
 
+  defp package do
+    [
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
+        "Design" => "https://hexdocs.pm/mediate/design.html"
+      }
+    ]
+  end
+
   # The checks rest on Credo's own check behaviour and its test case, and
-  # they read source text. So this is the whole dependency list,
-  # and no package of this repository is in it. Credo is a development and
-  # test dependency here as in every other package, because Mix asks that of
-  # an umbrella. Each check module sits under
-  # `Code.ensure_loaded?(Credo.Check)`, so a build without Credo compiles it
-  # to nothing. The pin is exact. Version verified against
+  # they read source text. So this is the whole dependency list, and no
+  # package of this repository is in it. The requirement on Credo is
+  # optional, because the Credo that runs these checks is the adopter's
+  # own, and because an optional requirement still puts Credo on the code
+  # path while this package compiles. A development and test requirement
+  # does not: the package then compiles before Credo, every check module
+  # falls through `Code.ensure_loaded?(Credo.Check)`, and the installed
+  # package holds no check at all. Each published requirement is
+  # compatible rather than exact, so an adopter already on a later patch
+  # can install this package, and mix.lock holds the version and the
+  # checksum this repository builds against. Version verified against
   # https://hex.pm/api/packages/credo on 2026-09-13.
   defp deps do
     [
-      {:credo, "1.7.19", only: [:dev, :test], runtime: false},
-      {:boundary, "0.10.4", runtime: false},
+      {:credo, "~> 1.7", optional: true, runtime: false},
+      {:boundary, "~> 0.10", runtime: false},
       {:styler, "1.12.2", only: [:dev, :test], runtime: false},
       {:ex_doc, "0.40.4", only: [:dev, :test], runtime: false},
       {:mix_audit, "2.1.5", only: [:dev, :test], runtime: false}
@@ -49,7 +71,12 @@ defmodule Mediate.Credo.MixProject do
   end
 
   defp docs do
-    [main: "readme", extras: ["README.md": [title: "Mediate Credo checks"]]]
+    [
+      main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
+      extras: ["README.md": [title: "Mediate Credo checks"]]
+    ]
   end
 
   # CVE-2026-32686 (GHSA-rhv4-8758-jx7v): an unbounded exponent when decimal

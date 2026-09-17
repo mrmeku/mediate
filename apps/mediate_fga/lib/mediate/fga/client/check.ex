@@ -13,6 +13,7 @@ defmodule Mediate.Fga.Client.Check do
   @enforce_keys [:tuple_key]
   defstruct [:tuple_key, :model, context: %{}, consistency: :unspecified]
 
+  @typedoc "One check request."
   @type t :: %__MODULE__{
           tuple_key: TupleKey.t(),
           model: String.t() | nil,

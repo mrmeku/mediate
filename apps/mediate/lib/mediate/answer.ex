@@ -29,6 +29,7 @@ defmodule Mediate.Answer do
   @enforce_keys [:verdict, :reason]
   defstruct [:verdict, :reason, version: nil, meta: %{}]
 
+  @typedoc "What the rule said about the request."
   @type verdict :: :allow | :deny
 
   @typedoc "Why the verdict is what it is, in a form a record carries without an attribute value."
@@ -41,6 +42,7 @@ defmodule Mediate.Answer do
           | :unknown_operation
           | :unknown_subject_kind
 
+  @typedoc "One answer: the verdict, why, the policy version that decided, and whatever the adapter puts in `meta`."
   @type t :: %__MODULE__{verdict: verdict(), reason: reason(), version: String.t() | nil, meta: map()}
 
   @doc "The reasons, in the order the type lists them."

@@ -1,8 +1,9 @@
 defmodule Mediate.Cerbos.Version do
   @moduledoc """
   The policy version of a sidecar: the commit of the repository the policy
-  files are in, which the binding names. `docs/events.md` under "Policy
-  version" has the event and what it carries.
+  files are in, which the binding names.
+  [the events document](https://hexdocs.pm/mediate/events.html) under
+  "Policy version" has the event and what it carries.
 
   The identifier is not a digest of the files, and it is not the `version`
   field inside a policy. That field runs variants of a policy side by side.

@@ -1,6 +1,6 @@
 # Design
 
-*Why is Mediate shaped this way, and what did it reject? For a reader who wants to change the shape.*
+_Why is Mediate shaped this way, and what did it reject? For a reader who wants to change the shape._
 
 Each entry is one decision, the alternative it rejected, and why. The moduledocs say what each thing does, and `docs/conformance.md` says what a test asserts.
 
@@ -48,6 +48,7 @@ Each entry is one decision, the alternative it rejected, and why. The moduledocs
 - **One package per adapter.** One package with optional dependencies was the alternative. An adopter of one mechanism carries no other mechanism's dependencies.
 - **`mediate` has three runtime dependencies, and a test holds the count.** The conformance suites are a package of their own, which an adapter author takes in the test environment. The suites in `mediate` was the alternative, and then an application that calls the port installs and starts a property-testing library.
 - **The test tools are an unpublished package.** The cluster and the engine launchers in `mediate` was the alternative. A launcher starts an OS process, and an adapter package carries no dependency its users do not need.
+- **A sibling binds by path in a checkout of this repository and by requirement everywhere else.** `in_umbrella: true` in the published `mix.exs` was the alternative, and Hex moves such a dependency to the excluded list, so the package reaches an adopter naming none of its siblings. `flake.nix` exports `MEDIATE_UMBRELLA`, each published `mix.exs` reads it, and `mix mediate.package` builds with it removed.
 - **Three interior places under each root.** A free layout was the alternative. `CONTRIBUTING.md` names the places, and the structure test enforces them.
 - **Library packages ship migration helpers, and only thin applications carry migrations.** An adapter package that carries the example's migrations names the example's domain, and an adapter is domain-free.
 - **Behaviours, not protocols.** A behaviour's `behaviour_info/1` enumerates its surface, and `function_exported?/3` answers an optional callback at runtime. One build then serves every adapter.

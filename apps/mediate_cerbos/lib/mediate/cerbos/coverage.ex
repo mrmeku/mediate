@@ -1,8 +1,9 @@
 defmodule Mediate.Cerbos.Coverage do
   @moduledoc """
   Declared-fact coverage for a compiled query plan: every column the query
-  reads is a declared fact. `docs/conformance.md` under "The laws" names this check as
-  `au12-07`.
+  reads is a declared fact.
+  [the conformance document](https://hexdocs.pm/mediate/conformance.html) under
+  "The laws" names this check as `au12-07`.
 
   A plan comes from the sidecar and becomes a query here. This is the one
   place where what a policy reads turns into what the database reads. So

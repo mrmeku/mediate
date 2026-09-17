@@ -84,9 +84,10 @@ defmodule Mediate.Conformance.RepoCase do
   ]
 
   @doc """
-  The guarantee table of `docs/conformance.md` under "The guarantees" as data, one id and one
-  sentence per row. The freeze test in `mediate` holds it to the document
-  row for row.
+  The guarantee table under "The guarantees" in
+  [the conformance document](https://hexdocs.pm/mediate/conformance.html) as
+  data, one id and one sentence per row. The freeze test in `mediate` holds
+  it to the document row for row.
   """
   @spec guarantees() :: [{String.t(), String.t()}]
   def guarantees, do: @guarantees

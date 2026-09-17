@@ -41,6 +41,7 @@ defmodule Mediate.Postgres.Binding do
   @enforce_keys [:repo, :schemas, :migrations_table]
   defstruct @enforce_keys
 
+  @typedoc "The bound repo, the schemas whose tables its policies protect, and where the version comes from."
   @type t :: %__MODULE__{repo: module(), schemas: [module()], migrations_table: String.t()}
 
   @doc "The schema of the binding's options."

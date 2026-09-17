@@ -12,5 +12,6 @@ defmodule Mediate.Fga.Relay.Entry do
   @enforce_keys [:position, :payload]
   defstruct @enforce_keys
 
+  @typedoc "One row on its way out."
   @type t :: %__MODULE__{position: pos_integer(), payload: term()}
 end

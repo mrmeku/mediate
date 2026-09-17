@@ -11,5 +11,6 @@ defmodule Mediate.Fga.Client.Write do
   @enforce_keys [:deletes, :writes]
   defstruct @enforce_keys
 
+  @typedoc "One write request: what it deletes, and what it writes."
   @type t :: %__MODULE__{deletes: [TupleKey.t()], writes: [TupleKey.t()]}
 end

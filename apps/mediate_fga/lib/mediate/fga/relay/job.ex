@@ -20,7 +20,9 @@ defmodule Mediate.Fga.Relay.Job do
 
   alias Mediate.Fga.Relay.Entry
 
+  @typedoc "The job's own options, which the runner validates and hands back to every callback."
   @type options :: keyword()
+  @typedoc "What a callback returns when it cannot read or deliver. The term is the job's own."
   @type failure :: {:error, term()}
 
   @doc "Entries above `from`, in position order, at most `limit` of them."

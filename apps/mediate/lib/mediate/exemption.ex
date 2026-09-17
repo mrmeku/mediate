@@ -8,6 +8,7 @@ defmodule Mediate.Exemption do
   @enforce_keys [:on, :caller, :reason, :kind]
   defstruct @enforce_keys
 
+  @typedoc "Who declared the opt-out: the caller, or the seam itself."
   @type kind :: :declared | :library
 
   @typedoc "`on` is the root source: a schema module, a table name, or `nil` for raw SQL."

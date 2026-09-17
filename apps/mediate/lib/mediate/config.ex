@@ -18,10 +18,14 @@ defmodule Mediate.Config do
   @enforce_keys [:adapter, :clock, :caps]
   defstruct @enforce_keys
 
+  @typedoc "The adapter module, with its own options beside it when it takes any."
   @type adapter :: module() | {module(), keyword()}
+  @typedoc "What the port calls for `now`. A test gives one that does not move."
   @type clock :: (-> DateTime.t())
+  @typedoc "The size above which a policy version carries a pointer rather than the text."
   @type caps :: [policy_content_bytes: pos_integer()]
 
+  @typedoc "The validated configuration, read once at boot."
   @type t :: %__MODULE__{adapter: adapter(), clock: clock(), caps: caps()}
 
   @doc "Validate a keyword list into the struct."

@@ -11,6 +11,7 @@ defmodule Mediate.PolicyVersion do
   @typedoc "The version identifier a decision record carries: a commit, a migration number, or a model id."
   @type ref :: String.t()
 
+  @typedoc "One published version, as the policy-version event carries it."
   @type t :: %__MODULE__{
           adapter: module(),
           version: ref(),

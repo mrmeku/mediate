@@ -1,10 +1,11 @@
 defmodule Mediate.Conformance.Law do
   @moduledoc """
-  The law table of `docs/conformance.md` under "The laws" as data. Each row has an id, a
-  sentence, and the controls it answers. `Mediate.Conformance.AdapterCase`
-  names each test from a row here. The freeze test in `mediate` holds this
-  table to the document row for row, so a change to one needs a commit
-  that changes both.
+  The law table under "The laws" in
+  [the conformance document](https://hexdocs.pm/mediate/conformance.html) as
+  data. Each row has an id, a sentence, and the controls it answers.
+  `Mediate.Conformance.AdapterCase` names each test from a row here. The
+  freeze test in `mediate` holds this table to the document row for row, so
+  a change to one needs a commit that changes both.
 
   The bodies are in `Mediate.Conformance.AdapterCase.Laws` and its modules.
   """
@@ -78,6 +79,7 @@ defmodule Mediate.Conformance.Law do
   @enforce_keys [:id, :sentence, :controls]
   defstruct @enforce_keys
 
+  @typedoc "One law: its id, its sentence, and the controls it answers."
   @type t :: %__MODULE__{id: String.t(), sentence: String.t(), controls: [String.t()]}
 
   @doc "Every law, in the order of the document."

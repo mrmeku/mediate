@@ -15,6 +15,7 @@ defmodule Mediate.Fga.Relay.Pass do
   @enforce_keys [:name, :held?, :delivered, :position, :more?, :at]
   defstruct @enforce_keys
 
+  @typedoc "What one pass did."
   @type t :: %__MODULE__{
           name: atom(),
           held?: boolean(),

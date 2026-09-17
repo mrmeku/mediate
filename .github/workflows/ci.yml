@@ -100,3 +100,39 @@ jobs:
       # free port with the in-memory datastore, so the run needs no container
       # and leaves nothing behind.
       - run: nix develop --command bash -c 'cd apps/example_fga && mix test --warnings-as-errors --cover'
+
+  # The same scenarios, against the tarballs rather than the umbrella. A
+  # sibling bound by path proves the source tree and proves nothing about
+  # what ships, because a tarball carries the files Hex was told to carry
+  # and no others. So this job builds every published package, unpacks it,
+  # and points each consumer at the unpacked copy. `MEDIATE_UMBRELLA` is
+  # unset for the run, which is the state an adopter is in.
+  packages:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [example, example_rbac, example_postgres, example_cerbos, example_fga]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      - run: nix develop --command mix mediate.package --check
+      - run: |
+          nix develop --command bash -c '
+            cd apps/${{ matrix.app }} &&
+            unset MEDIATE_UMBRELLA &&
+            MEDIATE_PACKAGES=../../tmp/package MIX_BUILD_ROOT=../../tmp/package/_build \
+              mix test --warnings-as-errors'
+      # A check module of the packaged mediate_credo compiles under
+      # `Code.ensure_loaded?(Credo.Check)`, and Credo passes a run with a
+      # check it cannot find. So one consumer runs the checks from the
+      # tarball, and `Mediate.CredoTest` holds the requirement that puts
+      # Credo on the path.
+      - if: matrix.app == 'example_rbac'
+        run: |
+          nix develop --command bash -c '
+            cd apps/${{ matrix.app }} &&
+            unset MEDIATE_UMBRELLA &&
+            MEDIATE_PACKAGES=../../tmp/package MIX_BUILD_ROOT=../../tmp/package/_build \
+              mix credo --strict --all'

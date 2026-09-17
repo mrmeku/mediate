@@ -17,6 +17,7 @@ defmodule Mediate.Fga.Drift do
   @enforce_keys [:missing, :extra, :checked_to]
   defstruct @enforce_keys
 
+  @typedoc "What one reconcile found."
   @type t :: %__MODULE__{
           missing: [TupleKey.t()],
           extra: [TupleKey.t()],

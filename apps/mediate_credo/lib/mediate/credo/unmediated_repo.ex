@@ -1,5 +1,6 @@
 if Code.ensure_loaded?(Credo.Check) do
   defmodule Mediate.Credo.UnmediatedRepo do
+    @moduledoc false
     use Credo.Check,
       id: "TS0002",
       base_priority: :high,

@@ -13,6 +13,7 @@ defmodule Mediate.Fga.Client.Read do
   @enforce_keys [:object_type]
   defstruct [:object_type, :object_id, :relation, :user, :continuation, limit: 100]
 
+  @typedoc "One read request."
   @type t :: %__MODULE__{
           object_type: String.t(),
           object_id: String.t() | nil,

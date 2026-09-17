@@ -29,6 +29,7 @@ defmodule Mediate.Postgres.Policy do
   @typedoc "The command a policy applies to, as `polcmd` spells it."
   @type command :: :all | :select | :insert | :update | :delete
 
+  @typedoc "One policy as `pg_policy` holds it."
   @type t :: %__MODULE__{
           name: String.t(),
           table: String.t(),

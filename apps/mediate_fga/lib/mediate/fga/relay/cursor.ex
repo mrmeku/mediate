@@ -20,6 +20,7 @@ defmodule Mediate.Fga.Relay.Cursor do
   @primary_key {:name, :string, autogenerate: false}
   @exemption {:exempt, :library}
 
+  @typedoc "One runner's cursor row."
   @type t :: %__MODULE__{}
 
   schema "mediate_relay_cursor" do

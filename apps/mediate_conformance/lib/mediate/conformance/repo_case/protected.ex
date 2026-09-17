@@ -9,6 +9,7 @@ defmodule Mediate.Conformance.RepoCase.Protected do
   use Ecto.Schema
   use Mediate.Schema
 
+  @typedoc "The schema struct. No refusal this drives reaches the table."
   @type t :: %__MODULE__{}
 
   schema "mediate_conformance_protected" do

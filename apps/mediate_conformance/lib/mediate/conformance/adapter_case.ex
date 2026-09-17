@@ -16,9 +16,11 @@ defmodule Mediate.Conformance.AdapterCase do
   adapter outside this repository points the template at its own tables
   and runs the same laws.
 
-  The tests are the laws of `docs/conformance.md` under "The laws". The name of each is
-  its id and its sentence from `Mediate.Conformance.Law`. The bodies live
-  in `Mediate.Conformance.AdapterCase.Laws` and its modules. The scope cap
+  The tests are the laws under "The laws" in
+  [the conformance document](https://hexdocs.pm/mediate/conformance.html).
+  The name of each is its id and its sentence from
+  `Mediate.Conformance.Law`. The bodies live in
+  `Mediate.Conformance.AdapterCase.Laws` and its modules. The scope cap
   declaration and the fact-write shape sit beside them.
 
   Three laws are properties over `Mediate.Conformance.Gen`. Each iteration writes a

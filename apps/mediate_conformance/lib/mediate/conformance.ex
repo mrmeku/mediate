@@ -2,7 +2,8 @@ defmodule Mediate.Conformance do
   @moduledoc """
   The conformance mechanisms:
 
-  - the law table of `docs/conformance.md` under "The laws"
+  - the law table under "The laws" in
+    [the conformance document](https://hexdocs.pm/mediate/conformance.html)
   - the adapter case that runs it
   - the repo case that holds a mediated repo to the seam's guarantees
 

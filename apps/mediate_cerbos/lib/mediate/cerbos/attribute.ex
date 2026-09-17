@@ -49,6 +49,7 @@ defmodule Mediate.Cerbos.Attribute do
   @typedoc "The attribute values of one row, by the name the declarations gave."
   @type values :: %{atom() => term()}
 
+  @typedoc "One attribute declaration: the name a policy reads, and where its value comes from."
   @type t :: %__MODULE__{name: atom(), source: source()}
 
   @doc "The attribute name the request-time facts travel under. No declaration can take it."

@@ -108,6 +108,9 @@
               export HEX_HOME="$root/.nix-hex"
               export PATH="$MIX_HOME/bin:$MIX_HOME/escripts:$HEX_HOME/bin:$PATH"
               export ERL_AFLAGS="-kernel shell_history enabled"
+              # A checkout of this repository binds each sibling package by
+              # path. Every other reader takes the requirement in mix.exs.
+              export MEDIATE_UMBRELLA=1
               mix local.hex --force --if-missing >/dev/null
               mix local.rebar --force --if-missing >/dev/null
             '';

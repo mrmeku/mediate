@@ -9,8 +9,10 @@ defmodule Mediate.Schema.Fact do
   @enforce_keys [:column, :kind, :subject, :object, :element]
   defstruct @enforce_keys
 
+  @typedoc "What the column says: an attribute of the subject, an attribute of the object, or a grant."
   @type kind :: :subject_attribute | :object_attribute | :relationship
 
+  @typedoc "One fact declaration, as `Mediate.Schema.fact/2` records it."
   @type t :: %__MODULE__{
           column: atom(),
           kind: kind(),
@@ -30,6 +32,7 @@ defmodule Mediate.Schema.Relationship do
   @enforce_keys [:subject, :object, :attributes]
   defstruct @enforce_keys
 
+  @typedoc "One relationship declaration, as `Mediate.Schema.relationship/1` records it."
   @type t :: %__MODULE__{subject: atom(), object: atom(), attributes: [atom()]}
 end
 

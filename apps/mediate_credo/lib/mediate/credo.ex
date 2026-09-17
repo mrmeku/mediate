@@ -11,9 +11,10 @@ if Code.ensure_loaded?(Credo.Check) do
 
     Both read source text, so this package depends on no other package here.
     A check reads what a file says, not what a call does at run time. So the
-    checks are advisory, and the seam is what keeps the log complete. Credo
-    is a development and test dependency, as it is for every package of this
-    umbrella, and the checks compile where it is present.
+    checks are advisory, and the seam is what keeps the log complete. The
+    requirement on Credo is optional, so the Credo an adopter already runs
+    is the one that loads these checks, and Credo is on the code path while
+    this package compiles.
     """
 
     use Boundary, top_level?: true, deps: [Credo]

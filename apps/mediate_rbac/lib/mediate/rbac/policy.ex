@@ -4,6 +4,7 @@ defmodule Mediate.Rbac.Policy.Role do
   @enforce_keys [:name, :permissions]
   defstruct @enforce_keys
 
+  @typedoc "One role and the operations it permits."
   @type t :: %__MODULE__{name: atom(), permissions: [atom()]}
 end
 
@@ -34,10 +35,16 @@ defmodule Mediate.Rbac.Policy.Clause do
   @enforce_keys [:name, :kind]
   defstruct [:name, :kind, source: nil, on: nil, role: nil, as: nil, through: [], predicate: nil, only: nil]
 
+  @typedoc "Whether the clause reads a relationship row or runs a function."
   @type kind :: :grant | :predicate
+
+  @typedoc "A function of the subject and the environment, returning a rule over the protected row or a yes or no."
   @type predicate :: (Mediate.subject(), Mediate.environment() -> Ecto.Query.dynamic_expr() | boolean())
+
+  @typedoc "One hop of a grant's chain: the schema, the column the inner set matches, and an optional `where:` capture."
   @type hop :: {module(), atom(), [where: (-> Ecto.Query.dynamic_expr())]}
 
+  @typedoc "One clause. The fields a grant uses and the fields a predicate uses are disjoint."
   @type t :: %__MODULE__{
           name: atom(),
           kind: kind(),
@@ -59,6 +66,7 @@ defmodule Mediate.Rbac.Policy.Object do
   @enforce_keys [:schema, :clauses]
   defstruct @enforce_keys
 
+  @typedoc "A protected schema and every clause of its rule."
   @type t :: %__MODULE__{schema: module(), clauses: [Clause.t()]}
 end
 
@@ -123,6 +131,7 @@ defmodule Mediate.Rbac.Policy do
                 approval: [type: :string, default: "unrecorded", doc: "Who approved it, or where."]
               )
 
+  @typedoc "A module that uses this one."
   @type t :: module()
 
   @doc "The options `use` accepts."

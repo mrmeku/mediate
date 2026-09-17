@@ -1,0 +1,74 @@
+name: release
+
+# The trigger. It runs on a `v*` tag and by hand, and it publishes nothing
+# until the tarballs pass the same scenarios `ci.yml` runs them through.
+# `HEX_API_KEY` is a repository secret, and it reaches the publish job alone.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to publish, such as v0.1.0.
+        required: true
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  # The seven packages carry one version, and the tag names it. A tag that
+  # says otherwise stops the run before anything reaches Hex.
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: |
+          expected="${TAG#v}"
+          for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_fga; do
+            found=$(grep -o '@version "[^"]*"' "apps/$app/mix.exs" | head -1 | cut -d'"' -f2)
+            if [ "$found" != "$expected" ]; then
+              echo "$app is at $found and the tag says $expected"
+              exit 1
+            fi
+          done
+          echo "every published package is at $expected"
+
+  packages:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [example, example_rbac, example_postgres, example_cerbos, example_fga]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      - run: nix develop --command mix mediate.package --check
+      - run: |
+          nix develop --command bash -c '
+            cd apps/${{ matrix.app }} &&
+            unset MEDIATE_UMBRELLA &&
+            MEDIATE_PACKAGES=../../tmp/package MIX_BUILD_ROOT=../../tmp/package/_build \
+              mix test --warnings-as-errors'
+
+  # One job, in order: a package cannot publish before the package it
+  # requires is on Hex. `MEDIATE_UMBRELLA` is unset, so each `mix.exs`
+  # binds its siblings by requirement.
+  publish:
+    needs: [version, packages]
+    runs-on: ubuntu-latest
+    environment: hex
+    env:
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - run: nix develop --command mix deps.get
+      - run: |
+          nix develop --command bash -c '
+            set -eu
+            unset MEDIATE_UMBRELLA
+            for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_fga; do
+              (cd "apps/$app" && mix hex.publish --yes)
+            done'

@@ -14,6 +14,7 @@ defmodule Mediate.Fga.Client.ListObjects do
   @enforce_keys [:user, :relation, :type]
   defstruct [:user, :relation, :type, :model, context: %{}, consistency: :unspecified]
 
+  @typedoc "One list-objects request."
   @type t :: %__MODULE__{
           user: String.t(),
           relation: String.t(),

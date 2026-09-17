@@ -74,6 +74,7 @@ defmodule Mediate.Fga.Outbox do
     field(:object, :string)
   end
 
+  @typedoc "One marker row."
   @type t :: %__MODULE__{}
 
   @doc "The name of the runner's cursor. The runner a thin application starts must use it too."

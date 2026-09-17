@@ -60,6 +60,7 @@ defmodule Mediate.Cerbos.Binding do
   @enforce_keys [:repo, :attributes, :policies, :commit]
   defstruct [:repo, :attributes, :policies, :commit, :author, :approval]
 
+  @typedoc "The bound repo, the attribute module, the policy directory, and the commit that names the version."
   @type t :: %__MODULE__{
           repo: module(),
           attributes: Attributes.t(),

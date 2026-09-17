@@ -8,7 +8,7 @@ package of this repository carries one version and one tag.
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.1.0] - 2026-09-17
 
 The first release: the port, the seam, the events, the conformance suites, the
 two Credo checks, and four adapters.

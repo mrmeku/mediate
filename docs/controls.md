@@ -61,7 +61,7 @@ The library emits what these need, and the deployer's consumer satisfies them.
 | Control | What the consumer does |
 |---|---|
 | AC-2(1), AC-2(5), AC-2(9), AC-2(12) | Automates account management, logs out inactive sessions, manages shared accounts, and monitors for atypical use, over the change and decision events |
-| AU-6, AU-6(1), AU-6(3) | Reviews the records weekly and correlates across repositories |
+| AU-6, AU-6(1), AU-6(3) | Reviews the records weekly and correlates across the audit stores |
 | AU-9, AU-9(4) | Protects the records and restricts access to them |
 | AU-11 | Retains the records for the period M-21-31 sets |
 | CM-3(4), CM-5(5) | Puts a security representative on the change board and limits who can publish a version |

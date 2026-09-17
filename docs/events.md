@@ -83,6 +83,6 @@ Each adapter publishes one event when it deploys a version. The metadata is `%{v
 ## What a consumer must not expect
 
 - No payload carries an OCSF class, category, or severity identifier. Those belong to the consumer. `Example.Infrastructure.Siem` shows one mapping.
-- No payload carries a value the rule read from the world. A decision says the question and the answer, never the clearance or the marking.
+- No payload carries a value the rule read from the world. A decision says the question and the answer, never the subject's employment or the object's visibility.
 - No event says a consumer stored it, a handler stayed attached, the write committed, or the old value was current.
 - A policy version over the cap carries a pointer and no text.

@@ -1,6 +1,6 @@
 defmodule ExamplePostgres.CoverageTest do
   @moduledoc """
-  Declared-fact coverage over the CUI policies: every column the policies of
+  Declared-fact coverage over the example's policies: every column the policies of
   this binding read is a declared fact of the example.
   `Mediate.Postgres.Coverage` says how the check reads the policies back,
   and `docs/conformance.md` names it `au12-07`.

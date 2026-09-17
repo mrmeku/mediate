@@ -6,16 +6,16 @@ This application binds the example of `example` to `Mediate.Rbac`. It boots the 
 
 | Rule | Mechanism | Test group |
 |---|---|---|
-| C1 | the `:assignment` and `:office` grants in `ExampleRbac.Infrastructure.Policy`, through the open program and the designating office | enforcement |
-| C2 | the `:controls` predicate in `ExampleRbac.Infrastructure.Predicates`, one subquery over the marking, the subject's row, and the designating agency | enforcement |
-| C3 | the left join to `categories` inside that subquery, whose `implied_controls` widen the declared ones | enforcement |
-| C4 | the banner `Example.Application.Documents` keeps at write time, beside the `:controls` predicate on portions | enforcement, least privilege |
-| C5 | the `controlled` clause of the same subquery, against the moment the port stamped on the call | enforcement |
-| C6 | the `named_list` clause, membership of the marking's `list`, which combines with nothing else | enforcement |
-| C7 | the role table in the policy, which grants the marking operations to the designator alone, and the seam's refusal without a decision | least privilege, emergency override |
+| C1 | the `:membership` and `:team` grants in `ExampleRbac.Infrastructure.Policy`, through the open project and the owning team | enforcement |
+| C2 | the `:restrictions` predicate in `ExampleRbac.Infrastructure.Predicates`, one subquery over the visibility, the subject's row, and the owning enterprise | enforcement |
+| C3 | the left join to `labels` inside that subquery, whose `implied_restrictions` widen the declared ones | enforcement |
+| C4 | the rollup `Example.Application.Repositories` keeps at write time, beside the `:restrictions` predicate on directories | enforcement, least privilege |
+| C5 | the `restricted` clause of the same subquery, against the moment the port stamped on the call | enforcement |
+| C6 | the `invite_only` clause, membership of the visibility's `invited` list, which combines with nothing else | enforcement |
+| C7 | the role table in the policy, which grants the visibility operations to the admin alone, and the seam's refusal without a decision | least privilege, emergency override |
 | C8 | the `:session` predicate, which reads `reauthenticated_at` from the environment | re-authentication |
-| C9 | the `:office` grant on the proposal beside the `:another_approver` predicate | separation of duties |
-| C10 | a declared exemption in `Example.Application.Documents`, with permission, justification, event, and report in the example's code | least privilege, emergency override |
+| C9 | the `:team` grant on the proposal beside the `:another_reviewer` predicate | separation of duties |
+| C10 | a declared exemption in `Example.Application.Repositories`, with permission, justification, event, and report in the example's code | least privilege, emergency override |
 | C11 | every predicate is a `dynamic` the adapter puts in the query at the call | revocation and expiry |
 | C12 | printed by the adapter's suite, never asserted | revocation and expiry |
 | C13 | the same grants and predicates compose the query `scope` returns | enforcement |

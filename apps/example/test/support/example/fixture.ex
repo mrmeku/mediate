@@ -1,23 +1,23 @@
 defmodule Example.Fixture do
   @moduledoc """
   The world every scenario starts from. The fixture inserts it through the
-  seam under a declared exemption. It has two agencies, each with an office
-  and a program, and categories with and without implied controls. Each
+  seam under a declared exemption. It has two enterprises, each with a team
+  and a project, and labels with and without implied restrictions. Each
   account holds one role, so a scenario can name the account for the role it
-  tests. A scenario adds documents through `document!/2`.
+  tests. A scenario adds repositories through `repository!/2`.
 
-  | Account | Kind | Employment | Nationality | Holds |
+  | Account | Kind | Employment | Country | Holds |
   |---|---|---|---|---|
-  | ann | user | federal | US | member of Alpha |
-  | bob | user | contractor | US | member of Alpha |
-  | carl | user | federal | FR | member of Alpha |
-  | dana | user | federal | US | designator of the domestic office |
-  | eve | user | federal | US | approver of the domestic office |
-  | frank | user | federal | US | nothing |
-  | gil | privileged | federal | US | the override permission, person gil |
-  | gil-user | user | federal | US | member of Alpha, person gil |
-  | hana | user | federal | US | designator of the foreign office |
-  | ivan | user | federal | FR | member of the foreign program |
+  | ann | user | employee | US | contributor of the Acme project |
+  | bob | user | contractor | US | contributor of the Acme project |
+  | carl | user | employee | FR | contributor of the Acme project |
+  | dana | user | employee | US | admin of the Acme team |
+  | eve | user | employee | US | reviewer of the Acme team |
+  | frank | user | employee | US | nothing |
+  | gil | privileged | employee | US | the override permission, person gil |
+  | gil-user | user | employee | US | contributor of the Acme project, person gil |
+  | hana | user | employee | US | admin of the Globex team |
+  | ivan | user | employee | FR | contributor of the Globex project |
   """
 
   use Boundary,
@@ -28,46 +28,46 @@ defmodule Example.Fixture do
   import Ecto.Query, only: [from: 2]
 
   alias Example.Application.Accounts
-  alias Example.Domain.Agency
-  alias Example.Domain.Banner
-  alias Example.Domain.Category
-  alias Example.Domain.Document
-  alias Example.Domain.Marking
-  alias Example.Domain.Office
-  alias Example.Domain.Portion
-  alias Example.Domain.Program
+  alias Example.Domain.Directory
+  alias Example.Domain.Enterprise
+  alias Example.Domain.Label
+  alias Example.Domain.Project
+  alias Example.Domain.Repository
+  alias Example.Domain.Rollup
+  alias Example.Domain.Team
   alias Example.Domain.User
+  alias Example.Domain.Visibility
   alias Example.Infrastructure.Repo
 
   @exempt {:exempt, "fixture: the world a scenario starts from"}
 
   # Children before parents, which is the order rows leave in.
-  @domain ~w(override_reports marking_proposals portions markings documents office_roles assignments
-    account_roles users programs offices agencies categories)
+  @domain ~w(override_reports visibility_proposals directories visibilities repositories team_roles memberships
+    account_roles users projects teams enterprises labels)
 
   @accounts [
-    {"ann", :user, :federal, "US", "ann"},
+    {"ann", :user, :employee, "US", "ann"},
     {"bob", :user, :contractor, "US", "bob"},
-    {"carl", :user, :federal, "FR", "carl"},
-    {"dana", :user, :federal, "US", "dana"},
-    {"eve", :user, :federal, "US", "eve"},
-    {"frank", :user, :federal, "US", "frank"},
-    {"gil", :privileged, :federal, "US", "gil"},
-    {"gil-user", :user, :federal, "US", "gil"},
-    {"hana", :user, :federal, "US", "hana"},
-    {"ivan", :user, :federal, "FR", "ivan"}
+    {"carl", :user, :employee, "FR", "carl"},
+    {"dana", :user, :employee, "US", "dana"},
+    {"eve", :user, :employee, "US", "eve"},
+    {"frank", :user, :employee, "US", "frank"},
+    {"gil", :privileged, :employee, "US", "gil"},
+    {"gil-user", :user, :employee, "US", "gil"},
+    {"hana", :user, :employee, "US", "hana"},
+    {"ivan", :user, :employee, "FR", "ivan"}
   ]
 
-  @enforce_keys [:agency, :office, :program, :foreign_agency, :foreign_office, :foreign_program]
+  @enforce_keys [:enterprise, :team, :project, :other_enterprise, :other_team, :other_project]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          agency: Agency.t(),
-          office: Office.t(),
-          program: Program.t(),
-          foreign_agency: Agency.t(),
-          foreign_office: Office.t(),
-          foreign_program: Program.t()
+          enterprise: Enterprise.t(),
+          team: Team.t(),
+          project: Project.t(),
+          other_enterprise: Enterprise.t(),
+          other_team: Team.t(),
+          other_project: Project.t()
         }
 
   @doc "The exemption fixture writes carry."
@@ -76,88 +76,88 @@ defmodule Example.Fixture do
 
   @doc "The account ids, in the table's order."
   @spec account_ids() :: [String.t()]
-  def account_ids, do: Enum.map(@accounts, fn {id, _kind, _employment, _nationality, _person} -> id end)
+  def account_ids, do: Enum.map(@accounts, fn {id, _kind, _employment, _country, _person} -> id end)
 
   @doc "Insert the world."
   @spec world!() :: t()
   def world! do
-    categories!()
-    {agency, office, program} = tenant!("Domestic", "US")
-    {foreign_agency, foreign_office, foreign_program} = tenant!("Foreign", "FR")
+    labels!()
+    {enterprise, team, project} = tenant!("Acme", "US")
+    {other_enterprise, other_team, other_project} = tenant!("Globex", "FR")
     accounts!()
-    Accounts.assign("ann", program.id, :member)
-    Accounts.assign("bob", program.id, :member)
-    Accounts.assign("carl", program.id, :member)
-    Accounts.assign("gil-user", program.id, :member)
-    Accounts.office_role("dana", office.id, :designator)
-    Accounts.office_role("eve", office.id, :approver)
+    Accounts.assign("ann", project.id, :contributor)
+    Accounts.assign("bob", project.id, :contributor)
+    Accounts.assign("carl", project.id, :contributor)
+    Accounts.assign("gil-user", project.id, :contributor)
+    Accounts.team_role("dana", team.id, :admin)
+    Accounts.team_role("eve", team.id, :reviewer)
     Accounts.grant_override("gil")
-    Accounts.office_role("hana", foreign_office.id, :designator)
-    Accounts.assign("ivan", foreign_program.id, :member)
+    Accounts.team_role("hana", other_team.id, :admin)
+    Accounts.assign("ivan", other_project.id, :contributor)
 
     %__MODULE__{
-      agency: agency,
-      office: office,
-      program: program,
-      foreign_agency: foreign_agency,
-      foreign_office: foreign_office,
-      foreign_program: foreign_program
+      enterprise: enterprise,
+      team: team,
+      project: project,
+      other_enterprise: other_enterprise,
+      other_team: other_team,
+      other_project: other_project
     }
   end
 
   @doc """
-  Insert a document of the world's domestic program with a banner and
-  portions. The banner is the given marking combined with the portions'. It
-  admits no subject any of them denies. Options:
+  Insert a repository of the world's Acme project with a rollup and
+  directories. The rollup is the given visibility combined with the
+  directories'. It admits no subject any of them denies. Options:
 
-  - `title:`, `program:`, `office:`, and `decontrol:`
-  - `categories:`, `controls:`, `releasable_to:`, and `list:`, the marking
-  - `portions:`, a list of maps with `body:` and marking fields
+  - `name:`, `project:`, `team:`, and `embargo:`
+  - `labels:`, `restrictions:`, `releasable_to:`, and `invited:`, the visibility
+  - `directories:`, a list of maps with `name:`, `contents:` and visibility fields
   """
-  @spec document!(t(), keyword()) :: Document.t()
-  def document!(%__MODULE__{} = world, opts \\ []) when is_list(opts) do
-    program = Keyword.get(opts, :program, world.program)
-    office = Keyword.get(opts, :office, world.office)
+  @spec repository!(t(), keyword()) :: Repository.t()
+  def repository!(%__MODULE__{} = world, opts \\ []) when is_list(opts) do
+    project = Keyword.get(opts, :project, world.project)
+    team = Keyword.get(opts, :team, world.team)
 
-    %Document{} =
-      document =
+    %Repository{} =
+      repository =
       Repo.insert!(
-        %Document{
-          title: Keyword.get(opts, :title, "document"),
-          decontrol: opts[:decontrol] && DateTime.truncate(opts[:decontrol], :second),
-          program_id: program.id,
-          designating_office_id: office.id
+        %Repository{
+          name: Keyword.get(opts, :name, "repository"),
+          embargo: opts[:embargo] && DateTime.truncate(opts[:embargo], :second),
+          project_id: project.id,
+          owning_team_id: team.id
         },
         mediate: @exempt
       )
 
-    portions =
-      for attrs <- Keyword.get(opts, :portions, []) do
-        Repo.insert!(struct!(%Portion{document_id: document.id}, attrs), mediate: @exempt)
+    directories =
+      for attrs <- Keyword.get(opts, :directories, []) do
+        Repo.insert!(struct!(%Directory{repository_id: repository.id}, attrs), mediate: @exempt)
       end
 
-    %{document | marking: marking!(document, opts, portions), portions: portions}
+    %{repository | visibility: visibility!(repository, opts, directories), directories: directories}
   end
 
-  @doc "Replace a document's list of accounts, as the fixture, outside any rule."
-  @spec set_list!(Document.t(), [String.t()]) :: Marking.t()
-  def set_list!(%Document{id: id}, list) when is_list(list) do
-    query = from(m in Marking, where: m.document_id == ^id)
-    marking = Repo.one!(query, mediate: @exempt)
-    Repo.update!(Ecto.Changeset.change(marking, list: list), mediate: @exempt)
+  @doc "Replace the accounts a repository invites, as the fixture, outside any rule."
+  @spec set_invited!(Repository.t(), [String.t()]) :: Visibility.t()
+  def set_invited!(%Repository{id: id}, accounts) when is_list(accounts) do
+    query = from(v in Visibility, where: v.repository_id == ^id)
+    visibility = Repo.one!(query, mediate: @exempt)
+    Repo.update!(Ecto.Changeset.change(visibility, invited: accounts), mediate: @exempt)
   end
 
-  @doc "Close a program now, as the fixture."
-  @spec close_program!(Program.t()) :: Program.t()
-  def close_program!(%Program{} = program) do
+  @doc "Archive a project now, as the fixture."
+  @spec archive_project!(Project.t()) :: Project.t()
+  def archive_project!(%Project{} = project) do
     now = DateTime.utc_now(:second)
-    Repo.update!(Ecto.Changeset.change(program, closed_at: now), mediate: @exempt)
+    Repo.update!(Ecto.Changeset.change(project, archived_at: now), mediate: @exempt)
   end
 
   @doc "The subject for an account of the world."
   @spec subject(String.t()) :: Mediate.subject()
   def subject(id) when is_binary(id) do
-    {^id, kind, _employment, _nationality, _person} = List.keyfind!(@accounts, id, 0)
+    {^id, kind, _employment, _country, _person} = List.keyfind!(@accounts, id, 0)
     {kind, id}
   end
 
@@ -165,7 +165,7 @@ defmodule Example.Fixture do
   @spec subjects() :: [Mediate.subject()]
   def subjects, do: Enum.map(account_ids(), &subject/1)
 
-  @doc "Insert an account with a nationality and an employment, that holds nothing."
+  @doc "Insert an account with a country and an employment, that holds nothing."
   @spec account!(String.t(), keyword()) :: User.t()
   def account!(id, opts \\ []) when is_binary(id) and is_list(opts) do
     Repo.insert!(
@@ -174,8 +174,8 @@ defmodule Example.Fixture do
         name: id,
         kind: Keyword.get(opts, :kind, :user),
         person_id: id,
-        employment: Keyword.get(opts, :employment, :federal),
-        nationality: Keyword.get(opts, :nationality, "US")
+        employment: Keyword.get(opts, :employment, :employee),
+        country: Keyword.get(opts, :country, "US")
       },
       mediate: @exempt
     )
@@ -192,42 +192,42 @@ defmodule Example.Fixture do
     :ok
   end
 
-  defp categories! do
+  defp labels! do
     rows = [
-      %Category{name: "PRVCY", specified: true, implied_controls: [:federal_only]},
-      %Category{name: "CTI", specified: true, implied_controls: [:no_foreign]},
-      %Category{name: "PROPIN", specified: false, implied_controls: [:federal_only]}
+      %Label{name: "secrets", sensitive: true, implied_restrictions: [:employees_only]},
+      %Label{name: "crypto", sensitive: true, implied_restrictions: [:export_controlled]},
+      %Label{name: "docs", sensitive: false, implied_restrictions: [:employees_only]}
     ]
 
     Enum.each(rows, &Repo.insert!(&1, mediate: @exempt))
   end
 
-  defp tenant!(name, nationality) do
-    agency = Repo.insert!(%Agency{name: name, nationality: nationality}, mediate: @exempt)
-    office = Repo.insert!(%Office{name: "#{name} office", agency_id: agency.id}, mediate: @exempt)
-    program = Repo.insert!(%Program{name: "#{name} program", office_id: office.id}, mediate: @exempt)
-    {agency, office, program}
+  defp tenant!(name, country) do
+    enterprise = Repo.insert!(%Enterprise{name: name, country: country}, mediate: @exempt)
+    team = Repo.insert!(%Team{name: "#{name} team", enterprise_id: enterprise.id}, mediate: @exempt)
+    project = Repo.insert!(%Project{name: "#{name} project", team_id: team.id}, mediate: @exempt)
+    {enterprise, team, project}
   end
 
   defp accounts! do
-    Enum.each(@accounts, fn {id, kind, employment, nationality, person} ->
+    Enum.each(@accounts, fn {id, kind, employment, country, person} ->
       Repo.insert!(
-        %User{id: id, name: id, kind: kind, person_id: person, employment: employment, nationality: nationality},
+        %User{id: id, name: id, kind: kind, person_id: person, employment: employment, country: country},
         mediate: @exempt
       )
     end)
   end
 
-  defp marking!(%Document{id: id}, opts, portions) do
-    banner = Banner.of([Map.new(opts) | portions])
+  defp visibility!(%Repository{id: id}, opts, directories) do
+    rollup = Rollup.of([Map.new(opts) | directories])
 
     Repo.insert!(
-      %Marking{
-        document_id: id,
-        categories: banner.categories,
-        controls: banner.controls,
-        releasable_to: banner.releasable_to,
-        list: Keyword.get(opts, :list, [])
+      %Visibility{
+        repository_id: id,
+        labels: rollup.labels,
+        restrictions: rollup.restrictions,
+        releasable_to: rollup.releasable_to,
+        invited: Keyword.get(opts, :invited, [])
       },
       mediate: @exempt
     )

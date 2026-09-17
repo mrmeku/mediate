@@ -6,10 +6,10 @@ defmodule Mediate.Postgres.PolicyTest do
 
   test "the adapter's two names are told apart from a policy someone else wrote" do
     scope = policy(Policy.scope_name("read"))
-    gate = policy(Policy.gate_name("change_marking"))
+    gate = policy(Policy.gate_name("change_visibility"))
 
     assert Policy.kind(scope) == {:scope, "read"}
-    assert Policy.kind(gate) == {:gate, "change_marking"}
+    assert Policy.kind(gate) == {:gate, "change_visibility"}
     assert Policy.kind(policy("tenant_isolation")) == :other
     assert Policy.kind(policy("mediate_scope_")) == :other
   end
@@ -27,10 +27,10 @@ defmodule Mediate.Postgres.PolicyTest do
     policies = [
       %{
         policy("mediate_scope_read")
-        | using: "(EXISTS ( SELECT 1\n   FROM public.office_roles\n  WHERE (role = 'designator'::text)))"
+        | using: "(EXISTS ( SELECT 1\n   FROM public.team_roles\n  WHERE (role = 'admin'::text)))"
       },
       %{
-        policy("mediate_gate_change_marking")
+        policy("mediate_gate_change_visibility")
         | command: :update,
           using: "true",
           with_check: "(now() > '2026-01-01'::date)"
@@ -50,10 +50,10 @@ defmodule Mediate.Postgres.PolicyTest do
 
   test "the statement that writes a policy names the command and only the clauses it has" do
     scope = %{policy("mediate_scope_read") | using: "true"}
-    gate = %{policy("mediate_gate_decontrol") | command: :update, using: "a", with_check: "b"}
+    gate = %{policy("mediate_gate_lift_embargo") | command: :update, using: "a", with_check: "b"}
 
     assert Policy.to_sql(scope) == "CREATE POLICY mediate_scope_read ON folders FOR SELECT USING (true)"
-    assert Policy.to_sql(gate) == "CREATE POLICY mediate_gate_decontrol ON folders FOR UPDATE USING (a) WITH CHECK (b)"
+    assert Policy.to_sql(gate) == "CREATE POLICY mediate_gate_lift_embargo ON folders FOR UPDATE USING (a) WITH CHECK (b)"
 
     assert Policy.to_sql(%{policy("p") | command: :all}) == "CREATE POLICY p ON folders FOR ALL"
 

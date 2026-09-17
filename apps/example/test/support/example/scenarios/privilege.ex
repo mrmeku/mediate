@@ -9,134 +9,143 @@ defmodule Example.Scenarios.Privilege do
   import ExUnit.Assertions
 
   alias Example.Application.Accounts
-  alias Example.Application.Documents
   alias Example.Application.Proposals
+  alias Example.Application.Repositories
   alias Example.Application.Review
-  alias Example.Domain.Document
   alias Example.Domain.Proposal
+  alias Example.Domain.Repository
   alias Example.Fixture
 
-  @noforn %{controls: [:no_foreign]}
+  @export %{restrictions: [:export_controlled]}
 
   @spec lp_01() :: term()
   def lp_01 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_refused(Documents.change_marking(subject("ann"), document.id, @noforn, fresh()), :change_marking)
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("ann"), document.id)
+    assert_read(subject("ann"), repository)
+    assert_refused(Repositories.change_visibility(subject("ann"), repository.id, @export, fresh()), :change_visibility)
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("ann"), repository.id)
   end
 
   @spec lp_02() :: term()
   def lp_02 do
     world = Fixture.world!()
-    foreign = Fixture.document!(world, program: world.foreign_program, office: world.foreign_office)
+    globex = Fixture.repository!(world, project: world.other_project, team: world.other_team)
 
     settle()
-    assert_refused(Documents.change_marking(subject("dana"), foreign.id, @noforn, fresh()), :change_marking)
-    domestic = Fixture.document!(world)
+    assert_refused(Repositories.change_visibility(subject("dana"), globex.id, @export, fresh()), :change_visibility)
+    acme = Fixture.repository!(world)
 
     settle()
-    assert_refused(Documents.change_marking(subject("hana"), domestic.id, @noforn, fresh()), :change_marking)
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), domestic.id)
+    assert_refused(Repositories.change_visibility(subject("hana"), acme.id, @export, fresh()), :change_visibility)
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("dana"), acme.id)
   end
 
   @spec lp_03() :: term()
   def lp_03 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
 
-    assert {:ok, %Example.Domain.Marking{controls: [:no_foreign]}} =
-             Documents.change_marking(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, %Example.Domain.Visibility{restrictions: [:export_controlled]}} =
+             Repositories.change_visibility(subject("dana"), repository.id, @export, fresh())
 
     settle()
-    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+
+    assert {:ok, %Repository{visibility: %{restrictions: [:export_controlled]}}} =
+             Repositories.read(subject("dana"), repository.id)
   end
 
   @spec lp_04() :: term()
   def lp_04 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:federal_only])
+    repository = Fixture.repository!(world, restrictions: [:employees_only])
     at = DateTime.shift(DateTime.utc_now(), minute: -1)
 
     settle()
-    assert_refused(Documents.set_decontrol(subject("ann"), document.id, at, fresh()), :set_decontrol)
-    assert_refused(Documents.decontrol(subject("eve"), document.id, fresh()), :decontrol)
-    assert_denied(subject("bob"), document)
-    assert {:ok, %Document{decontrol: %DateTime{}}} = Documents.set_decontrol(subject("dana"), document.id, at, fresh())
+    assert_refused(Repositories.set_embargo(subject("ann"), repository.id, at, fresh()), :set_embargo)
+    assert_refused(Repositories.lift_embargo(subject("eve"), repository.id, fresh()), :lift_embargo)
+    assert_denied(subject("bob"), repository)
+
+    assert {:ok, %Repository{embargo: %DateTime{}}} =
+             Repositories.set_embargo(subject("dana"), repository.id, at, fresh())
 
     settle()
-    assert_read(subject("bob"), document)
+    assert_read(subject("bob"), repository)
   end
 
   @spec lp_05() :: term()
   def lp_05 do
     world = Fixture.world!()
-    document = Fixture.document!(world, portions: [%{body: "open"}])
-    [portion] = document.portions
-    tightened = %{controls: [:no_foreign]}
+    repository = Fixture.repository!(world, directories: [%{name: "open", contents: "open"}])
+    [directory] = repository.directories
+    tightened = %{restrictions: [:export_controlled]}
 
     settle()
 
     for id <- ["ann", "eve", "hana"] do
-      assert_refused(Documents.change_portion_marking(subject(id), portion.id, tightened, fresh()), :change_marking)
+      assert_refused(
+        Repositories.change_directory_visibility(subject(id), directory.id, tightened, fresh()),
+        :change_visibility
+      )
     end
 
-    assert {:ok, %Example.Domain.Portion{controls: [:no_foreign]}} =
-             Documents.change_portion_marking(subject("dana"), portion.id, tightened, fresh())
+    assert {:ok, %Example.Domain.Directory{restrictions: [:export_controlled]}} =
+             Repositories.change_directory_visibility(subject("dana"), directory.id, tightened, fresh())
 
     settle()
-    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+
+    assert {:ok, %Repository{visibility: %{restrictions: [:export_controlled]}}} =
+             Repositories.read(subject("dana"), repository.id)
   end
 
   @spec lp_06() :: term()
   def lp_06 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_denied(subject("frank"), document)
+    assert_denied(subject("frank"), repository)
 
-    assert {:error, %Documents.OverrideRefused{reason: :not_privileged}} =
-             Documents.override_read(subject("frank"), document.id, "incident 12")
+    assert {:error, %Repositories.OverrideRefused{reason: :not_privileged}} =
+             Repositories.override_read(subject("frank"), repository.id, "incident 12")
 
-    assert Documents.override_reports(world.office.id) == []
+    assert Repositories.override_reports(world.team.id) == []
   end
 
   @spec lp_07() :: term()
   def lp_07 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:named_list], list: ["frank"])
+    repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["frank"])
     ordinary = subject("gil-user")
     assert {:user, _id} = ordinary
 
     settle()
-    assert_denied(ordinary, document)
+    assert_denied(ordinary, repository)
 
-    assert {:error, %Documents.OverrideRefused{reason: :not_privileged}} =
-             Documents.override_read(ordinary, document.id, "incident 12")
+    assert {:error, %Repositories.OverrideRefused{reason: :not_privileged}} =
+             Repositories.override_read(ordinary, repository.id, "incident 12")
 
-    assert {:ok, %Document{}} = Documents.override_read(subject("gil"), document.id, "incident 12")
-    assert [%{user_id: "gil"}] = Documents.override_reports(world.office.id)
+    assert {:ok, %Repository{}} = Repositories.override_read(subject("gil"), repository.id, "incident 12")
+    assert [%{user_id: "gil"}] = Repositories.override_reports(world.team.id)
   end
 
   @spec lp_08() :: term()
   def lp_08 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:federal_only])
+    repository = Fixture.repository!(world, restrictions: [:employees_only])
 
     settle()
     report = Review.report(subject("eve"), fresh())
-    assert report =~ "agency Domestic"
-    assert report =~ "ann reads [#{document.id}]"
+    assert report =~ "enterprise Acme"
+    assert report =~ "ann reads [#{repository.id}]"
     assert report =~ "bob reads []"
-    assert report =~ "dana may change_marking [#{document.id}]"
-    assert report =~ "ann may change_marking []"
-    assert report =~ "eve may change_marking []"
+    assert report =~ "dana may change_visibility [#{repository.id}]"
+    assert report =~ "ann may change_visibility []"
+    assert report =~ "eve may change_visibility []"
     assert report =~ "privileged accounts"
     assert report =~ "gil (person gil) holds [override]"
     refute report =~ "gil-user (person"
@@ -145,66 +154,69 @@ defmodule Example.Scenarios.Privilege do
   @spec sod_01() :: term()
   def sod_01 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert {:ok, proposal} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, proposal} = Proposals.propose(subject("dana"), repository.id, @export, fresh())
 
     settle()
 
-    assert {:ok, %Proposal{status: :approved, approver_id: "eve"}} =
+    assert {:ok, %Proposal{status: :approved, reviewer_id: "eve"}} =
              Proposals.approve(subject("eve"), proposal.id, fresh())
 
     settle()
-    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
+
+    assert {:ok, %Repository{visibility: %{restrictions: [:export_controlled]}}} =
+             Repositories.read(subject("dana"), repository.id)
+
     assert {:error, :not_found} = Proposals.approve(subject("eve"), proposal.id, fresh())
   end
 
   @spec sod_02() :: term()
   def sod_02 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
-    _role = Accounts.office_role("dana", world.office.id, :approver)
+    repository = Fixture.repository!(world)
+    _role = Accounts.team_role("dana", world.team.id, :reviewer)
 
-    refute_own_approval(document)
-    assert_approval_of_another(world, document)
+    refute_own_approval(repository)
+    assert_approval_of_another(world, repository)
   end
 
   @spec sod_03() :: term()
   def sod_03 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert {:ok, %Proposal{status: :pending}} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, %Proposal{status: :pending}} = Proposals.propose(subject("dana"), repository.id, @export, fresh())
 
     settle()
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
-    assert_read(subject("carl"), document)
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("dana"), repository.id)
+    assert_read(subject("carl"), repository)
   end
 
   # An account with both roles cannot approve what it proposed. The port
-  # refuses the approval, and the marking stays where it was.
-  defp refute_own_approval(document) do
+  # refuses the approval, and the visibility stays where it was.
+  defp refute_own_approval(repository) do
     settle()
-    assert {:ok, proposal} = Proposals.propose(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, proposal} = Proposals.propose(subject("dana"), repository.id, @export, fresh())
 
     settle()
-    assert_refused(Proposals.approve(subject("dana"), proposal.id, fresh()), :approve_marking)
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
+    assert_refused(Proposals.approve(subject("dana"), proposal.id, fresh()), :approve_visibility)
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("dana"), repository.id)
   end
 
   # The same account approves what another proposed. So it holds the role,
   # and what it lacks is the standing to approve its own proposal.
-  defp assert_approval_of_another(world, document) do
-    _role = Accounts.office_role("eve", world.office.id, :designator)
+  defp assert_approval_of_another(world, repository) do
+    _role = Accounts.team_role("eve", world.team.id, :admin)
 
     settle()
-    assert {:ok, other} = Proposals.propose(subject("eve"), document.id, %{controls: [:federal_only]}, fresh())
+    assert {:ok, other} = Proposals.propose(subject("eve"), repository.id, %{restrictions: [:employees_only]}, fresh())
 
     settle()
 
-    assert {:ok, %Proposal{status: :approved, approver_id: "dana"}} =
+    assert {:ok, %Proposal{status: :approved, reviewer_id: "dana"}} =
              Proposals.approve(subject("dana"), other.id, fresh())
   end
 end

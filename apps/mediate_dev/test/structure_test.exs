@@ -43,8 +43,8 @@ defmodule StructureTest do
   @published ~w(mediate mediate_conformance mediate_rbac mediate_postgres mediate_cerbos mediate_fga)
 
   @exceptions %{
-    "apps/example/lib/example/domain/document.ex" =>
-      "a document, its markings, its portions, and its proposals refer to one another"
+    "apps/example/lib/example/domain/repository.ex" =>
+      "a repository, its visibility, its directories, and its proposals refer to one another"
   }
 
   # The modules of Elixir and Erlang whose functions reach outside the call:

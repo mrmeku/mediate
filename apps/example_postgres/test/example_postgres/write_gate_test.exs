@@ -1,7 +1,7 @@
 defmodule ExamplePostgres.WriteGateTest do
   @moduledoc """
   The defense-in-depth property this binding has and no other: the database
-  refuses a marking change that C7 refuses, whether or not the application
+  refuses a visibility change that C7 refuses, whether or not the application
   asked. A gate carries no operation guard, so it holds whoever writes and
   whatever they asked first. The property is the binding's and not a rule of
   the example, so no scenario tests it.
@@ -16,7 +16,7 @@ defmodule ExamplePostgres.WriteGateTest do
   alias Example.Fixture
   alias Example.Infrastructure.OwnerRepo
 
-  @update "UPDATE markings SET controls = ARRAY['federal_only'] WHERE document_id = $1"
+  @update "UPDATE visibilities SET restrictions = ARRAY['employees_only'] WHERE repository_id = $1"
 
   setup do
     :ok = Sandbox.checkout(Example.Infrastructure.Repo, sandbox: false)
@@ -25,11 +25,11 @@ defmodule ExamplePostgres.WriteGateTest do
     :ok
   end
 
-  test "a C7-violating marking change is refused by the database whether or not the application asked" do
+  test "a C7-violating visibility change is refused by the database whether or not the application asked" do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
-    error = assert_raise Postgrex.Error, fn -> OwnerRepo.query!(@update, [document.id]) end
+    error = assert_raise Postgrex.Error, fn -> OwnerRepo.query!(@update, [repository.id]) end
 
     assert error.postgres.code == :insufficient_privilege
     assert error.postgres.message =~ "row-level security policy"

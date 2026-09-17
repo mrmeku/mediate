@@ -18,8 +18,8 @@ defmodule ExampleRbac.Infrastructure.PolicyTest do
   end
 
   test "the role table holds the permissions docs/example.md gives each role" do
-    assert Mediate.Rbac.Policy.roles_for(Policy, :read) == [:member, :lead, :designator, :approver]
-    assert Mediate.Rbac.Policy.roles_for(Policy, :change_marking) == [:designator]
-    assert Mediate.Rbac.Policy.roles_for(Policy, :approve_marking) == [:approver]
+    assert Mediate.Rbac.Policy.roles_for(Policy, :read) == [:contributor, :maintainer, :admin, :reviewer]
+    assert Mediate.Rbac.Policy.roles_for(Policy, :change_visibility) == [:admin]
+    assert Mediate.Rbac.Policy.roles_for(Policy, :approve_visibility) == [:reviewer]
   end
 end

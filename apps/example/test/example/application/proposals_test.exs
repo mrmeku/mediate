@@ -1,10 +1,10 @@
 defmodule Example.Application.ProposalsTest do
   use Example.FakeCase, async: true
 
-  alias Example.Application.Documents
   alias Example.Application.Proposals
-  alias Example.Domain.Marking
+  alias Example.Application.Repositories
   alias Example.Domain.Proposal
+  alias Example.Domain.Visibility
   alias Example.Fixture
   alias Example.Infrastructure.Repo
   alias Mediate.Error
@@ -13,40 +13,47 @@ defmodule Example.Application.ProposalsTest do
   @eve {:user, "eve"}
 
   setup %{world: world} do
-    {:ok, document: Fixture.document!(world)}
+    {:ok, repository: Fixture.repository!(world)}
   end
 
-  test "propose needs the document's operation and records a pending proposal", ctx do
-    assert {:error, %Error{detail: "user dana may not propose_marking" <> _rest}} =
-             Proposals.propose(@dana, ctx.document.id, %{controls: [:no_foreign]})
+  test "propose needs the repository's operation and records a pending proposal", ctx do
+    assert {:error, %Error{detail: "user dana may not propose_visibility" <> _rest}} =
+             Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
 
-    allow(ctx.rules, "dana", :propose_marking, {:document, ctx.document.id})
+    allow(ctx.rules, "dana", :propose_visibility, {:repository, ctx.repository.id})
 
-    assert {:ok, %Proposal{status: :pending, proposer_id: "dana", controls: [:no_foreign]}} =
-             Proposals.propose(@dana, ctx.document.id, %{controls: [:no_foreign]})
+    assert {:ok, %Proposal{status: :pending, proposer_id: "dana", restrictions: [:export_controlled]}} =
+             Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
 
-    assert {:ok, %Proposal{}} = Proposals.propose(@dana, ctx.document.id, %{"controls" => ["federal_only"]})
+    assert {:ok, %Proposal{}} = Proposals.propose(@dana, ctx.repository.id, %{"restrictions" => ["employees_only"]})
   end
 
-  test "approve needs the proposal's operation, applies the marking, and closes the proposal", ctx do
-    allow(ctx.rules, "dana", :propose_marking, {:document, ctx.document.id})
-    {:ok, proposal} = Proposals.propose(@dana, ctx.document.id, %{controls: [:no_foreign]})
-    assert {:error, %Error{detail: "user eve may not approve_marking" <> _rest}} = Proposals.approve(@eve, proposal.id)
-    allow(ctx.rules, "eve", :approve_marking, {:proposal, proposal.id})
-    assert {:ok, %Proposal{status: :approved, approver_id: "eve"}} = Proposals.approve(@eve, proposal.id)
+  test "approve needs the proposal's operation, applies the visibility, and closes the proposal", ctx do
+    allow(ctx.rules, "dana", :propose_visibility, {:repository, ctx.repository.id})
+    {:ok, proposal} = Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
+    assert {:error, %Error{detail: "user eve may not approve_visibility" <> _rest}} = Proposals.approve(@eve, proposal.id)
+    allow(ctx.rules, "eve", :approve_visibility, {:proposal, proposal.id})
+    assert {:ok, %Proposal{status: :approved, reviewer_id: "eve"}} = Proposals.approve(@eve, proposal.id)
     assert {:error, :not_found} = Proposals.approve(@eve, proposal.id)
-    allow(ctx.rules, "eve", :read, {:document, ctx.document.id})
-    assert {:ok, %{marking: %Marking{controls: [:no_foreign]}}} = Documents.read(@eve, ctx.document.id)
-    allow(ctx.rules, "eve", :approve_marking, {:proposal, :any})
+    allow(ctx.rules, "eve", :read, {:repository, ctx.repository.id})
+
+    assert {:ok, %{visibility: %Visibility{restrictions: [:export_controlled]}}} =
+             Repositories.read(@eve, ctx.repository.id)
+
+    allow(ctx.rules, "eve", :approve_visibility, {:proposal, :any})
     assert {:error, :not_found} = Proposals.approve(@eve, proposal.id + 1000)
   end
 
-  test "an approval that would break the banner rolls back the proposal", ctx do
-    document = Fixture.document!(ctx.world, portions: [%{body: "domestic", controls: [:no_foreign]}])
-    allow(ctx.rules, "dana", :propose_marking, {:document, document.id})
-    {:ok, proposal} = Proposals.propose(@dana, document.id, %{controls: []})
-    allow(ctx.rules, "eve", :approve_marking, {:proposal, proposal.id})
-    assert {:error, %Documents.BannerViolation{}} = Proposals.approve(@eve, proposal.id)
+  test "an approval that would break the rollup rolls back the proposal", ctx do
+    repository =
+      Fixture.repository!(ctx.world,
+        directories: [%{name: "export", contents: "export", restrictions: [:export_controlled]}]
+      )
+
+    allow(ctx.rules, "dana", :propose_visibility, {:repository, repository.id})
+    {:ok, proposal} = Proposals.propose(@dana, repository.id, %{restrictions: []})
+    allow(ctx.rules, "eve", :approve_visibility, {:proposal, proposal.id})
+    assert {:error, %Repositories.RollupViolation{}} = Proposals.approve(@eve, proposal.id)
 
     assert %Proposal{status: :pending} =
              Repo.get(Proposal, proposal.id, mediate: Fixture.exemption())

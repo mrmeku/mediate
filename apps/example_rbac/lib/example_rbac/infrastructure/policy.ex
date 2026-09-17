@@ -5,52 +5,52 @@ defmodule ExampleRbac.Infrastructure.Policy do
 
   The grants:
 
-  - a program role reaches a document through its open program (C1), and a
-    portion through its document
-  - an office role reaches a document through its designating office
-    (C1, C7), and a proposal through the document's office (C9)
+  - a project role reaches a repository through its open project (C1), and a
+    directory through its repository
+  - a team role reaches a repository through its owning team
+    (C1, C7), and a proposal through the repository's team (C9)
 
   The predicates:
 
-  - `:controls` is C2, C3, C5, and C6 in one subquery
+  - `:restrictions` is C2, C3, C5, and C6 in one subquery
   - `:session` is C8
-  - `:another_approver` is C9
+  - `:another_reviewer` is C9
   """
 
   use Mediate.Rbac.Policy, version: "2026.09.1", author: "example_rbac", approval: "the rules in docs/example.md"
 
-  alias Example.Domain.Assignment
-  alias Example.Domain.Document
-  alias Example.Domain.OfficeRole
-  alias Example.Domain.Portion
-  alias Example.Domain.Program
+  alias Example.Domain.Directory
+  alias Example.Domain.Membership
+  alias Example.Domain.Project
   alias Example.Domain.Proposal
+  alias Example.Domain.Repository
+  alias Example.Domain.TeamRole
   alias ExampleRbac.Infrastructure.Predicates
 
-  role :member, [:read, :read_redacted]
-  role :lead, [:read, :read_redacted]
-  role :designator, [:read, :read_redacted, :change_marking, :set_decontrol, :decontrol, :propose_marking]
-  role :approver, [:read, :read_redacted, :approve_marking]
+  role :contributor, [:read, :checkout]
+  role :maintainer, [:read, :checkout]
+  role :admin, [:read, :checkout, :change_visibility, :set_embargo, :lift_embargo, :propose_visibility]
+  role :reviewer, [:read, :checkout, :approve_visibility]
 
-  object Document do
-    grant :assignment, Assignment, on: :program_id, through: [{Program, :id, where: &Predicates.open/0}]
-    grant :office, OfficeRole, on: :designating_office_id
-    predicate :controls, &Predicates.controls/2, only: [:read]
-    predicate :session, &Predicates.session/2, only: [:change_marking, :set_decontrol, :decontrol]
+  object Repository do
+    grant :membership, Membership, on: :project_id, through: [{Project, :id, where: &Predicates.open/0}]
+    grant :team, TeamRole, on: :owning_team_id
+    predicate :restrictions, &Predicates.restrictions/2, only: [:read]
+    predicate :session, &Predicates.session/2, only: [:change_visibility, :set_embargo, :lift_embargo]
   end
 
-  object Portion do
-    grant :assignment, Assignment,
-      on: :document_id,
-      through: [{Document, :program_id}, {Program, :id, where: &Predicates.open/0}]
+  object Directory do
+    grant :membership, Membership,
+      on: :repository_id,
+      through: [{Repository, :project_id}, {Project, :id, where: &Predicates.open/0}]
 
-    grant :office, OfficeRole, on: :document_id, through: [{Document, :designating_office_id}]
-    predicate :controls, &Predicates.portion_controls/2, only: [:read]
-    predicate :session, &Predicates.session/2, only: [:change_marking]
+    grant :team, TeamRole, on: :repository_id, through: [{Repository, :owning_team_id}]
+    predicate :restrictions, &Predicates.directory_restrictions/2, only: [:read]
+    predicate :session, &Predicates.session/2, only: [:change_visibility]
   end
 
   object Proposal do
-    grant :office, OfficeRole, on: :document_id, through: [{Document, :designating_office_id}]
-    predicate :another_approver, &Predicates.another_approver/2, only: [:approve_marking]
+    grant :team, TeamRole, on: :repository_id, through: [{Repository, :owning_team_id}]
+    predicate :another_reviewer, &Predicates.another_reviewer/2, only: [:approve_visibility]
   end
 end

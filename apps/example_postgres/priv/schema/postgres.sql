@@ -19,40 +19,40 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: mediate_document_decontrol(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
+-- Name: mediate_repository_embargo(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
 --
 
-CREATE FUNCTION public.mediate_document_decontrol(document bigint) RETURNS timestamp without time zone
+CREATE FUNCTION public.mediate_repository_embargo(repository bigint) RETURNS timestamp without time zone
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
-    AS $$SELECT decontrol FROM documents WHERE id = document$$;
+    AS $$SELECT embargo FROM repositories WHERE id = repository$$;
 
 
-ALTER FUNCTION public.mediate_document_decontrol(document bigint) OWNER TO mediate_owner;
+ALTER FUNCTION public.mediate_repository_embargo(repository bigint) OWNER TO mediate_owner;
 
 --
--- Name: mediate_document_office(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
+-- Name: mediate_repository_owning_team(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
 --
 
-CREATE FUNCTION public.mediate_document_office(document bigint) RETURNS bigint
+CREATE FUNCTION public.mediate_repository_owning_team(repository bigint) RETURNS bigint
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
-    AS $$SELECT designating_office_id FROM documents WHERE id = document$$;
+    AS $$SELECT owning_team_id FROM repositories WHERE id = repository$$;
 
 
-ALTER FUNCTION public.mediate_document_office(document bigint) OWNER TO mediate_owner;
+ALTER FUNCTION public.mediate_repository_owning_team(repository bigint) OWNER TO mediate_owner;
 
 --
--- Name: mediate_document_program(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
+-- Name: mediate_repository_project(bigint); Type: FUNCTION; Schema: public; Owner: mediate_owner
 --
 
-CREATE FUNCTION public.mediate_document_program(document bigint) RETURNS bigint
+CREATE FUNCTION public.mediate_repository_project(repository bigint) RETURNS bigint
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
-    AS $$SELECT program_id FROM documents WHERE id = document$$;
+    AS $$SELECT project_id FROM repositories WHERE id = repository$$;
 
 
-ALTER FUNCTION public.mediate_document_program(document bigint) OWNER TO mediate_owner;
+ALTER FUNCTION public.mediate_repository_project(repository bigint) OWNER TO mediate_owner;
 
 SET default_tablespace = '';
 
@@ -93,23 +93,29 @@ ALTER SEQUENCE public.account_roles_id_seq OWNED BY public.account_roles.id;
 
 
 --
--- Name: agencies; Type: TABLE; Schema: public; Owner: mediate_owner
+-- Name: directories; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
-CREATE TABLE public.agencies (
+CREATE TABLE public.directories (
     id bigint NOT NULL,
+    repository_id bigint NOT NULL,
     name text NOT NULL,
-    nationality text NOT NULL
+    contents text NOT NULL,
+    labels text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL
 );
 
+ALTER TABLE ONLY public.directories FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE public.agencies OWNER TO mediate_owner;
+
+ALTER TABLE public.directories OWNER TO mediate_owner;
 
 --
--- Name: agencies_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+-- Name: directories_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
 --
 
-CREATE SEQUENCE public.agencies_id_seq
+CREATE SEQUENCE public.directories_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -117,34 +123,81 @@ CREATE SEQUENCE public.agencies_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.agencies_id_seq OWNER TO mediate_owner;
+ALTER SEQUENCE public.directories_id_seq OWNER TO mediate_owner;
 
 --
--- Name: agencies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+-- Name: directories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
 --
 
-ALTER SEQUENCE public.agencies_id_seq OWNED BY public.agencies.id;
+ALTER SEQUENCE public.directories_id_seq OWNED BY public.directories.id;
 
 
 --
--- Name: assignments; Type: TABLE; Schema: public; Owner: mediate_owner
+-- Name: enterprises; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
-CREATE TABLE public.assignments (
+CREATE TABLE public.enterprises (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    country text NOT NULL
+);
+
+
+ALTER TABLE public.enterprises OWNER TO mediate_owner;
+
+--
+-- Name: enterprises_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.enterprises_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.enterprises_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: enterprises_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.enterprises_id_seq OWNED BY public.enterprises.id;
+
+
+--
+-- Name: labels; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.labels (
+    name text NOT NULL,
+    sensitive boolean DEFAULT false NOT NULL,
+    implied_restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL
+);
+
+
+ALTER TABLE public.labels OWNER TO mediate_owner;
+
+--
+-- Name: memberships; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.memberships (
     id bigint NOT NULL,
     user_id text NOT NULL,
-    program_id bigint NOT NULL,
+    project_id bigint NOT NULL,
     role text NOT NULL
 );
 
 
-ALTER TABLE public.assignments OWNER TO mediate_owner;
+ALTER TABLE public.memberships OWNER TO mediate_owner;
 
 --
--- Name: assignments_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+-- Name: memberships_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
 --
 
-CREATE SEQUENCE public.assignments_id_seq
+CREATE SEQUENCE public.memberships_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -152,214 +205,13 @@ CREATE SEQUENCE public.assignments_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.assignments_id_seq OWNER TO mediate_owner;
+ALTER SEQUENCE public.memberships_id_seq OWNER TO mediate_owner;
 
 --
--- Name: assignments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+-- Name: memberships_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
 --
 
-ALTER SEQUENCE public.assignments_id_seq OWNED BY public.assignments.id;
-
-
---
--- Name: categories; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.categories (
-    name text NOT NULL,
-    specified boolean DEFAULT false NOT NULL,
-    implied_controls text[] DEFAULT ARRAY[]::text[] NOT NULL
-);
-
-
-ALTER TABLE public.categories OWNER TO mediate_owner;
-
---
--- Name: documents; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.documents (
-    id bigint NOT NULL,
-    title text NOT NULL,
-    decontrol timestamp(0) without time zone,
-    program_id bigint NOT NULL,
-    designating_office_id bigint NOT NULL
-);
-
-ALTER TABLE ONLY public.documents FORCE ROW LEVEL SECURITY;
-
-
-ALTER TABLE public.documents OWNER TO mediate_owner;
-
---
--- Name: documents_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.documents_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.documents_id_seq OWNER TO mediate_owner;
-
---
--- Name: documents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.documents_id_seq OWNED BY public.documents.id;
-
-
---
--- Name: marking_proposals; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.marking_proposals (
-    id bigint NOT NULL,
-    document_id bigint NOT NULL,
-    proposer_id text NOT NULL,
-    approver_id text,
-    status text DEFAULT 'pending'::text NOT NULL,
-    categories text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    controls text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    list text[] DEFAULT ARRAY[]::text[] NOT NULL
-);
-
-ALTER TABLE ONLY public.marking_proposals FORCE ROW LEVEL SECURITY;
-
-
-ALTER TABLE public.marking_proposals OWNER TO mediate_owner;
-
---
--- Name: marking_proposals_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.marking_proposals_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.marking_proposals_id_seq OWNER TO mediate_owner;
-
---
--- Name: marking_proposals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.marking_proposals_id_seq OWNED BY public.marking_proposals.id;
-
-
---
--- Name: markings; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.markings (
-    id bigint NOT NULL,
-    document_id bigint NOT NULL,
-    categories text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    controls text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    list text[] DEFAULT ARRAY[]::text[] NOT NULL
-);
-
-ALTER TABLE ONLY public.markings FORCE ROW LEVEL SECURITY;
-
-
-ALTER TABLE public.markings OWNER TO mediate_owner;
-
---
--- Name: markings_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.markings_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.markings_id_seq OWNER TO mediate_owner;
-
---
--- Name: markings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.markings_id_seq OWNED BY public.markings.id;
-
-
---
--- Name: office_roles; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.office_roles (
-    id bigint NOT NULL,
-    user_id text NOT NULL,
-    office_id bigint NOT NULL,
-    role text NOT NULL
-);
-
-
-ALTER TABLE public.office_roles OWNER TO mediate_owner;
-
---
--- Name: office_roles_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.office_roles_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.office_roles_id_seq OWNER TO mediate_owner;
-
---
--- Name: office_roles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.office_roles_id_seq OWNED BY public.office_roles.id;
-
-
---
--- Name: offices; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.offices (
-    id bigint NOT NULL,
-    name text NOT NULL,
-    agency_id bigint NOT NULL
-);
-
-
-ALTER TABLE public.offices OWNER TO mediate_owner;
-
---
--- Name: offices_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.offices_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.offices_id_seq OWNER TO mediate_owner;
-
---
--- Name: offices_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.offices_id_seq OWNED BY public.offices.id;
+ALTER SEQUENCE public.memberships_id_seq OWNED BY public.memberships.id;
 
 
 --
@@ -368,8 +220,8 @@ ALTER SEQUENCE public.offices_id_seq OWNED BY public.offices.id;
 
 CREATE TABLE public.override_reports (
     id bigint NOT NULL,
-    document_id bigint NOT NULL,
-    office_id bigint NOT NULL,
+    repository_id bigint NOT NULL,
+    team_id bigint NOT NULL,
     user_id text NOT NULL,
     justification text NOT NULL,
     operation_id text NOT NULL,
@@ -401,63 +253,24 @@ ALTER SEQUENCE public.override_reports_id_seq OWNED BY public.override_reports.i
 
 
 --
--- Name: portions; Type: TABLE; Schema: public; Owner: mediate_owner
+-- Name: projects; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
-CREATE TABLE public.portions (
-    id bigint NOT NULL,
-    document_id bigint NOT NULL,
-    body text NOT NULL,
-    categories text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    controls text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL
-);
-
-ALTER TABLE ONLY public.portions FORCE ROW LEVEL SECURITY;
-
-
-ALTER TABLE public.portions OWNER TO mediate_owner;
-
---
--- Name: portions_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.portions_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.portions_id_seq OWNER TO mediate_owner;
-
---
--- Name: portions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.portions_id_seq OWNED BY public.portions.id;
-
-
---
--- Name: programs; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.programs (
+CREATE TABLE public.projects (
     id bigint NOT NULL,
     name text NOT NULL,
-    closed_at timestamp(0) without time zone,
-    office_id bigint NOT NULL
+    archived_at timestamp(0) without time zone,
+    team_id bigint NOT NULL
 );
 
 
-ALTER TABLE public.programs OWNER TO mediate_owner;
+ALTER TABLE public.projects OWNER TO mediate_owner;
 
 --
--- Name: programs_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+-- Name: projects_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
 --
 
-CREATE SEQUENCE public.programs_id_seq
+CREATE SEQUENCE public.projects_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -465,13 +278,51 @@ CREATE SEQUENCE public.programs_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.programs_id_seq OWNER TO mediate_owner;
+ALTER SEQUENCE public.projects_id_seq OWNER TO mediate_owner;
 
 --
--- Name: programs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+-- Name: projects_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
 --
 
-ALTER SEQUENCE public.programs_id_seq OWNED BY public.programs.id;
+ALTER SEQUENCE public.projects_id_seq OWNED BY public.projects.id;
+
+
+--
+-- Name: repositories; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.repositories (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    embargo timestamp(0) without time zone,
+    project_id bigint NOT NULL,
+    owning_team_id bigint NOT NULL
+);
+
+ALTER TABLE ONLY public.repositories FORCE ROW LEVEL SECURITY;
+
+
+ALTER TABLE public.repositories OWNER TO mediate_owner;
+
+--
+-- Name: repositories_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.repositories_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.repositories_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: repositories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.repositories_id_seq OWNED BY public.repositories.id;
 
 
 --
@@ -487,6 +338,75 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO mediate_owner;
 
 --
+-- Name: team_roles; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.team_roles (
+    id bigint NOT NULL,
+    user_id text NOT NULL,
+    team_id bigint NOT NULL,
+    role text NOT NULL
+);
+
+
+ALTER TABLE public.team_roles OWNER TO mediate_owner;
+
+--
+-- Name: team_roles_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.team_roles_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.team_roles_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: team_roles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.team_roles_id_seq OWNED BY public.team_roles.id;
+
+
+--
+-- Name: teams; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.teams (
+    id bigint NOT NULL,
+    name text NOT NULL,
+    enterprise_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.teams OWNER TO mediate_owner;
+
+--
+-- Name: teams_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.teams_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.teams_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: teams_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
@@ -496,11 +416,92 @@ CREATE TABLE public.users (
     kind text NOT NULL,
     person_id text NOT NULL,
     employment text NOT NULL,
-    nationality text NOT NULL
+    country text NOT NULL
 );
 
 
 ALTER TABLE public.users OWNER TO mediate_owner;
+
+--
+-- Name: visibilities; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.visibilities (
+    id bigint NOT NULL,
+    repository_id bigint NOT NULL,
+    labels text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    invited text[] DEFAULT ARRAY[]::text[] NOT NULL
+);
+
+ALTER TABLE ONLY public.visibilities FORCE ROW LEVEL SECURITY;
+
+
+ALTER TABLE public.visibilities OWNER TO mediate_owner;
+
+--
+-- Name: visibilities_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.visibilities_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.visibilities_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: visibilities_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.visibilities_id_seq OWNED BY public.visibilities.id;
+
+
+--
+-- Name: visibility_proposals; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.visibility_proposals (
+    id bigint NOT NULL,
+    repository_id bigint NOT NULL,
+    proposer_id text NOT NULL,
+    reviewer_id text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    labels text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    invited text[] DEFAULT ARRAY[]::text[] NOT NULL
+);
+
+ALTER TABLE ONLY public.visibility_proposals FORCE ROW LEVEL SECURITY;
+
+
+ALTER TABLE public.visibility_proposals OWNER TO mediate_owner;
+
+--
+-- Name: visibility_proposals_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.visibility_proposals_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.visibility_proposals_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: visibility_proposals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.visibility_proposals_id_seq OWNED BY public.visibility_proposals.id;
+
 
 --
 -- Name: account_roles id; Type: DEFAULT; Schema: public; Owner: mediate_owner
@@ -510,52 +511,24 @@ ALTER TABLE ONLY public.account_roles ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- Name: agencies id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: directories id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.agencies ALTER COLUMN id SET DEFAULT nextval('public.agencies_id_seq'::regclass);
-
-
---
--- Name: assignments id; Type: DEFAULT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.assignments ALTER COLUMN id SET DEFAULT nextval('public.assignments_id_seq'::regclass);
+ALTER TABLE ONLY public.directories ALTER COLUMN id SET DEFAULT nextval('public.directories_id_seq'::regclass);
 
 
 --
--- Name: documents id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: enterprises id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.documents ALTER COLUMN id SET DEFAULT nextval('public.documents_id_seq'::regclass);
-
-
---
--- Name: marking_proposals id; Type: DEFAULT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.marking_proposals ALTER COLUMN id SET DEFAULT nextval('public.marking_proposals_id_seq'::regclass);
+ALTER TABLE ONLY public.enterprises ALTER COLUMN id SET DEFAULT nextval('public.enterprises_id_seq'::regclass);
 
 
 --
--- Name: markings id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: memberships id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.markings ALTER COLUMN id SET DEFAULT nextval('public.markings_id_seq'::regclass);
-
-
---
--- Name: office_roles id; Type: DEFAULT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.office_roles ALTER COLUMN id SET DEFAULT nextval('public.office_roles_id_seq'::regclass);
-
-
---
--- Name: offices id; Type: DEFAULT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.offices ALTER COLUMN id SET DEFAULT nextval('public.offices_id_seq'::regclass);
+ALTER TABLE ONLY public.memberships ALTER COLUMN id SET DEFAULT nextval('public.memberships_id_seq'::regclass);
 
 
 --
@@ -566,17 +539,45 @@ ALTER TABLE ONLY public.override_reports ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- Name: portions id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: projects id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.portions ALTER COLUMN id SET DEFAULT nextval('public.portions_id_seq'::regclass);
+ALTER TABLE ONLY public.projects ALTER COLUMN id SET DEFAULT nextval('public.projects_id_seq'::regclass);
 
 
 --
--- Name: programs id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: repositories id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.programs ALTER COLUMN id SET DEFAULT nextval('public.programs_id_seq'::regclass);
+ALTER TABLE ONLY public.repositories ALTER COLUMN id SET DEFAULT nextval('public.repositories_id_seq'::regclass);
+
+
+--
+-- Name: team_roles id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.team_roles ALTER COLUMN id SET DEFAULT nextval('public.team_roles_id_seq'::regclass);
+
+
+--
+-- Name: teams id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_id_seq'::regclass);
+
+
+--
+-- Name: visibilities id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.visibilities ALTER COLUMN id SET DEFAULT nextval('public.visibilities_id_seq'::regclass);
+
+
+--
+-- Name: visibility_proposals id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.visibility_proposals ALTER COLUMN id SET DEFAULT nextval('public.visibility_proposals_id_seq'::regclass);
 
 
 --
@@ -588,67 +589,35 @@ ALTER TABLE ONLY public.account_roles
 
 
 --
--- Name: agencies agencies_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: directories directories_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.agencies
-    ADD CONSTRAINT agencies_pkey PRIMARY KEY (id);
-
-
---
--- Name: assignments assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.assignments
-    ADD CONSTRAINT assignments_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.directories
+    ADD CONSTRAINT directories_pkey PRIMARY KEY (id);
 
 
 --
--- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: enterprises enterprises_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.categories
-    ADD CONSTRAINT categories_pkey PRIMARY KEY (name);
-
-
---
--- Name: documents documents_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.documents
-    ADD CONSTRAINT documents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.enterprises
+    ADD CONSTRAINT enterprises_pkey PRIMARY KEY (id);
 
 
 --
--- Name: marking_proposals marking_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: labels labels_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.marking_proposals
-    ADD CONSTRAINT marking_proposals_pkey PRIMARY KEY (id);
-
-
---
--- Name: markings markings_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.markings
-    ADD CONSTRAINT markings_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.labels
+    ADD CONSTRAINT labels_pkey PRIMARY KEY (name);
 
 
 --
--- Name: office_roles office_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.office_roles
-    ADD CONSTRAINT office_roles_pkey PRIMARY KEY (id);
-
-
---
--- Name: offices offices_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.offices
-    ADD CONSTRAINT offices_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.memberships
+    ADD CONSTRAINT memberships_pkey PRIMARY KEY (id);
 
 
 --
@@ -660,19 +629,19 @@ ALTER TABLE ONLY public.override_reports
 
 
 --
--- Name: portions portions_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.portions
-    ADD CONSTRAINT portions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_pkey PRIMARY KEY (id);
 
 
 --
--- Name: programs programs_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: repositories repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.programs
-    ADD CONSTRAINT programs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
 
 
 --
@@ -684,11 +653,43 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: team_roles team_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.team_roles
+    ADD CONSTRAINT team_roles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: visibilities visibilities_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.visibilities
+    ADD CONSTRAINT visibilities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: visibility_proposals visibility_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.visibility_proposals
+    ADD CONSTRAINT visibility_proposals_pkey PRIMARY KEY (id);
 
 
 --
@@ -699,24 +700,24 @@ CREATE UNIQUE INDEX account_roles_user_id_role_index ON public.account_roles USI
 
 
 --
--- Name: assignments_user_id_program_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
+-- Name: memberships_user_id_project_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
 --
 
-CREATE UNIQUE INDEX assignments_user_id_program_id_index ON public.assignments USING btree (user_id, program_id);
-
-
---
--- Name: markings_document_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
---
-
-CREATE UNIQUE INDEX markings_document_id_index ON public.markings USING btree (document_id);
+CREATE UNIQUE INDEX memberships_user_id_project_id_index ON public.memberships USING btree (user_id, project_id);
 
 
 --
--- Name: office_roles_user_id_office_id_role_index; Type: INDEX; Schema: public; Owner: mediate_owner
+-- Name: team_roles_user_id_team_id_role_index; Type: INDEX; Schema: public; Owner: mediate_owner
 --
 
-CREATE UNIQUE INDEX office_roles_user_id_office_id_role_index ON public.office_roles USING btree (user_id, office_id, role);
+CREATE UNIQUE INDEX team_roles_user_id_team_id_role_index ON public.team_roles USING btree (user_id, team_id, role);
+
+
+--
+-- Name: visibilities_repository_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
+--
+
+CREATE UNIQUE INDEX visibilities_repository_id_index ON public.visibilities USING btree (repository_id);
 
 
 --
@@ -728,107 +729,43 @@ ALTER TABLE ONLY public.account_roles
 
 
 --
--- Name: assignments assignments_program_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: directories directories_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.assignments
-    ADD CONSTRAINT assignments_program_id_fkey FOREIGN KEY (program_id) REFERENCES public.programs(id);
-
-
---
--- Name: assignments assignments_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.assignments
-    ADD CONSTRAINT assignments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.directories
+    ADD CONSTRAINT directories_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
 
 
 --
--- Name: documents documents_designating_office_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: memberships memberships_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.documents
-    ADD CONSTRAINT documents_designating_office_id_fkey FOREIGN KEY (designating_office_id) REFERENCES public.offices(id);
-
-
---
--- Name: documents documents_program_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.documents
-    ADD CONSTRAINT documents_program_id_fkey FOREIGN KEY (program_id) REFERENCES public.programs(id);
+ALTER TABLE ONLY public.memberships
+    ADD CONSTRAINT memberships_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
 
 --
--- Name: marking_proposals marking_proposals_approver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: memberships memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.marking_proposals
-    ADD CONSTRAINT marking_proposals_approver_id_fkey FOREIGN KEY (approver_id) REFERENCES public.users(id);
-
-
---
--- Name: marking_proposals marking_proposals_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.marking_proposals
-    ADD CONSTRAINT marking_proposals_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id);
+ALTER TABLE ONLY public.memberships
+    ADD CONSTRAINT memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
--- Name: marking_proposals marking_proposals_proposer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.marking_proposals
-    ADD CONSTRAINT marking_proposals_proposer_id_fkey FOREIGN KEY (proposer_id) REFERENCES public.users(id);
-
-
---
--- Name: markings markings_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.markings
-    ADD CONSTRAINT markings_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id);
-
-
---
--- Name: office_roles office_roles_office_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.office_roles
-    ADD CONSTRAINT office_roles_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
-
-
---
--- Name: office_roles office_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.office_roles
-    ADD CONSTRAINT office_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
-
-
---
--- Name: offices offices_agency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.offices
-    ADD CONSTRAINT offices_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES public.agencies(id);
-
-
---
--- Name: override_reports override_reports_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: override_reports override_reports_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.override_reports
-    ADD CONSTRAINT override_reports_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id);
+    ADD CONSTRAINT override_reports_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
 
 
 --
--- Name: override_reports override_reports_office_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: override_reports override_reports_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.override_reports
-    ADD CONSTRAINT override_reports_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+    ADD CONSTRAINT override_reports_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
 
 
 --
@@ -840,338 +777,402 @@ ALTER TABLE ONLY public.override_reports
 
 
 --
--- Name: portions portions_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: projects projects_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.portions
-    ADD CONSTRAINT portions_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id);
-
-
---
--- Name: programs programs_office_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.programs
-    ADD CONSTRAINT programs_office_id_fkey FOREIGN KEY (office_id) REFERENCES public.offices(id);
+ALTER TABLE ONLY public.projects
+    ADD CONSTRAINT projects_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
 
 
 --
--- Name: documents; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
+-- Name: repositories repositories_owning_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
-
---
--- Name: marking_proposals; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE public.marking_proposals ENABLE ROW LEVEL SECURITY;
-
---
--- Name: markings; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE public.markings ENABLE ROW LEVEL SECURITY;
-
---
--- Name: markings mediate_admit_select; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_admit_select ON public.markings FOR SELECT USING (true);
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_owning_team_id_fkey FOREIGN KEY (owning_team_id) REFERENCES public.teams(id);
 
 
 --
--- Name: documents mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories repositories_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_exempt_mediate_app_insert ON public.documents FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
-
-
---
--- Name: markings mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_exempt_mediate_app_insert ON public.markings FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
+ALTER TABLE ONLY public.repositories
+    ADD CONSTRAINT repositories_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id);
 
 
 --
--- Name: portions mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: team_roles team_roles_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_exempt_mediate_app_insert ON public.portions FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
-
-
---
--- Name: documents mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_exempt_mediate_app_select ON public.documents FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
+ALTER TABLE ONLY public.team_roles
+    ADD CONSTRAINT team_roles_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
 
 
 --
--- Name: marking_proposals mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: team_roles team_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_exempt_mediate_app_select ON public.marking_proposals FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
-
-
---
--- Name: portions mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_exempt_mediate_app_select ON public.portions FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
+ALTER TABLE ONLY public.team_roles
+    ADD CONSTRAINT team_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
--- Name: markings mediate_exempt_mediate_app_update; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: teams teams_enterprise_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_exempt_mediate_app_update ON public.markings FOR UPDATE USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text))) WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
-
-
---
--- Name: documents mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_exempt_mediate_owner_select ON public.documents FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id);
 
 
 --
--- Name: marking_proposals mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibilities visibilities_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_exempt_mediate_owner_select ON public.marking_proposals FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
-
-
---
--- Name: portions mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_exempt_mediate_owner_select ON public.portions FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
+ALTER TABLE ONLY public.visibilities
+    ADD CONSTRAINT visibilities_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
 
 
 --
--- Name: marking_proposals mediate_gate_approve_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibility_proposals visibility_proposals_proposer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_gate_approve_marking ON public.marking_proposals FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(marking_proposals.document_id)) AND (r.role = ANY (ARRAY['approver'::text]))))) AND (proposer_id <> current_setting('mediate.subject_id'::text, true))));
-
-
---
--- Name: markings mediate_gate_approve_marking; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_gate_approve_marking ON public.markings FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(markings.document_id)) AND (r.role = ANY (ARRAY['approver'::text]))))) AND (EXISTS ( SELECT 1
-   FROM public.marking_proposals p
-  WHERE ((p.document_id = markings.document_id) AND (p.status = 'pending'::text) AND (p.proposer_id <> current_setting('mediate.subject_id'::text, true)))))));
+ALTER TABLE ONLY public.visibility_proposals
+    ADD CONSTRAINT visibility_proposals_proposer_id_fkey FOREIGN KEY (proposer_id) REFERENCES public.users(id);
 
 
 --
--- Name: documents mediate_gate_change_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibility_proposals visibility_proposals_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_gate_change_marking ON public.documents FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
-
-
---
--- Name: markings mediate_gate_change_marking; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_gate_change_marking ON public.markings FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(markings.document_id)) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+ALTER TABLE ONLY public.visibility_proposals
+    ADD CONSTRAINT visibility_proposals_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
 
 
 --
--- Name: portions mediate_gate_change_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibility_proposals visibility_proposals_reviewer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_gate_change_marking ON public.portions FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(portions.document_id)) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
-
-
---
--- Name: documents mediate_gate_decontrol; Type: POLICY; Schema: public; Owner: mediate_owner
---
-
-CREATE POLICY mediate_gate_decontrol ON public.documents FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+ALTER TABLE ONLY public.visibility_proposals
+    ADD CONSTRAINT visibility_proposals_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id);
 
 
 --
--- Name: marking_proposals mediate_gate_propose_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: directories; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_gate_propose_marking ON public.marking_proposals FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(marking_proposals.document_id)) AND (r.role = ANY (ARRAY['designator'::text]))))) AND (proposer_id = current_setting('mediate.subject_id'::text, true))));
-
+ALTER TABLE public.directories ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: documents mediate_gate_set_decontrol; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibilities mediate_admit_select; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_gate_set_decontrol ON public.documents FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+CREATE POLICY mediate_admit_select ON public.visibilities FOR SELECT USING (true);
 
 
 --
--- Name: documents mediate_scope_approve_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: directories mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_approve_marking ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'approve_marking'::text) AND (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['approver'::text])))))));
+CREATE POLICY mediate_exempt_mediate_app_insert ON public.directories FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: marking_proposals mediate_scope_approve_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_approve_marking ON public.marking_proposals FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'approve_marking'::text) AND ((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(marking_proposals.document_id)) AND (r.role = ANY (ARRAY['approver'::text]))))) AND (proposer_id <> current_setting('mediate.subject_id'::text, true)))));
+CREATE POLICY mediate_exempt_mediate_app_insert ON public.repositories FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: documents mediate_scope_change_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibilities mediate_exempt_mediate_app_insert; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_change_marking ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'change_marking'::text) AND ((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+CREATE POLICY mediate_exempt_mediate_app_insert ON public.visibilities FOR INSERT WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: portions mediate_scope_change_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: directories mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_change_marking ON public.portions FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'change_marking'::text) AND ((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(portions.document_id)) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+CREATE POLICY mediate_exempt_mediate_app_select ON public.directories FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: documents mediate_scope_decontrol; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_decontrol ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'decontrol'::text) AND ((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+CREATE POLICY mediate_exempt_mediate_app_select ON public.repositories FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: documents mediate_scope_propose_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibility_proposals mediate_exempt_mediate_app_select; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_propose_marking ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'propose_marking'::text) AND (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text])))))));
+CREATE POLICY mediate_exempt_mediate_app_select ON public.visibility_proposals FOR SELECT USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: marking_proposals mediate_scope_propose_marking; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: visibilities mediate_exempt_mediate_app_update; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_propose_marking ON public.marking_proposals FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'propose_marking'::text) AND (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(marking_proposals.document_id)) AND (r.role = ANY (ARRAY['designator'::text])))))));
+CREATE POLICY mediate_exempt_mediate_app_update ON public.visibilities FOR UPDATE USING (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text))) WITH CHECK (((CURRENT_USER = 'mediate_app'::name) AND (COALESCE(current_setting('mediate.operation'::text, true), ''::text) = ''::text)));
 
 
 --
--- Name: documents mediate_scope_read; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: directories mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_read ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'read'::text) AND (((EXISTS ( SELECT 1
-   FROM (public.assignments a
-     JOIN public.programs p ON ((p.id = a.program_id)))
-  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.program_id = documents.program_id) AND (a.role = ANY (ARRAY['lead'::text, 'member'::text])) AND (p.closed_at IS NULL)))) OR (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text, 'approver'::text])))))) AND (NOT (EXISTS ( SELECT 1
-   FROM ((((public.markings m
-     JOIN public.offices o ON ((o.id = documents.designating_office_id)))
-     JOIN public.agencies g ON ((g.id = o.agency_id)))
+CREATE POLICY mediate_exempt_mediate_owner_select ON public.directories FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
+
+
+--
+-- Name: repositories mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_exempt_mediate_owner_select ON public.repositories FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
+
+
+--
+-- Name: visibility_proposals mediate_exempt_mediate_owner_select; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_exempt_mediate_owner_select ON public.visibility_proposals FOR SELECT USING ((CURRENT_USER = 'mediate_owner'::name));
+
+
+--
+-- Name: visibilities mediate_gate_approve_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_approve_visibility ON public.visibilities FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibilities.repository_id)) AND (r.role = ANY (ARRAY['reviewer'::text]))))) AND (EXISTS ( SELECT 1
+   FROM public.visibility_proposals p
+  WHERE ((p.repository_id = visibilities.repository_id) AND (p.status = 'pending'::text) AND (p.proposer_id <> current_setting('mediate.subject_id'::text, true)))))));
+
+
+--
+-- Name: visibility_proposals mediate_gate_approve_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_approve_visibility ON public.visibility_proposals FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibility_proposals.repository_id)) AND (r.role = ANY (ARRAY['reviewer'::text]))))) AND (proposer_id <> current_setting('mediate.subject_id'::text, true))));
+
+
+--
+-- Name: directories mediate_gate_change_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_change_visibility ON public.directories FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(directories.repository_id)) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+
+
+--
+-- Name: repositories mediate_gate_change_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_change_visibility ON public.repositories FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+
+
+--
+-- Name: visibilities mediate_gate_change_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_change_visibility ON public.visibilities FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibilities.repository_id)) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+
+
+--
+-- Name: repositories mediate_gate_lift_embargo; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_lift_embargo ON public.repositories FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+
+
+--
+-- Name: visibility_proposals mediate_gate_propose_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_propose_visibility ON public.visibility_proposals FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibility_proposals.repository_id)) AND (r.role = ANY (ARRAY['admin'::text]))))) AND (proposer_id = current_setting('mediate.subject_id'::text, true))));
+
+
+--
+-- Name: repositories mediate_gate_set_embargo; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_gate_set_embargo ON public.repositories FOR UPDATE USING (true) WITH CHECK (((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval))));
+
+
+--
+-- Name: repositories mediate_scope_approve_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_approve_visibility ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'approve_visibility'::text) AND (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['reviewer'::text])))))));
+
+
+--
+-- Name: visibility_proposals mediate_scope_approve_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_approve_visibility ON public.visibility_proposals FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'approve_visibility'::text) AND ((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibility_proposals.repository_id)) AND (r.role = ANY (ARRAY['reviewer'::text]))))) AND (proposer_id <> current_setting('mediate.subject_id'::text, true)))));
+
+
+--
+-- Name: directories mediate_scope_change_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_change_visibility ON public.directories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'change_visibility'::text) AND ((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(directories.repository_id)) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+
+
+--
+-- Name: repositories mediate_scope_change_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_change_visibility ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'change_visibility'::text) AND ((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+
+
+--
+-- Name: repositories mediate_scope_checkout; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_checkout ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'checkout'::text) AND ((EXISTS ( SELECT 1
+   FROM (public.memberships a
+     JOIN public.projects p ON ((p.id = a.project_id)))
+  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.project_id = repositories.project_id) AND (a.role = ANY (ARRAY['maintainer'::text, 'contributor'::text])) AND (p.archived_at IS NULL)))) OR (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text, 'reviewer'::text]))))))));
+
+
+--
+-- Name: repositories mediate_scope_lift_embargo; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_lift_embargo ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'lift_embargo'::text) AND ((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
+
+
+--
+-- Name: repositories mediate_scope_propose_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_propose_visibility ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'propose_visibility'::text) AND (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text])))))));
+
+
+--
+-- Name: visibility_proposals mediate_scope_propose_visibility; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_propose_visibility ON public.visibility_proposals FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'propose_visibility'::text) AND (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(visibility_proposals.repository_id)) AND (r.role = ANY (ARRAY['admin'::text])))))));
+
+
+--
+-- Name: directories mediate_scope_read; Type: POLICY; Schema: public; Owner: mediate_owner
+--
+
+CREATE POLICY mediate_scope_read ON public.directories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'read'::text) AND (((EXISTS ( SELECT 1
+   FROM (public.memberships a
+     JOIN public.projects p ON ((p.id = a.project_id)))
+  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.project_id = public.mediate_repository_project(directories.repository_id)) AND (a.role = ANY (ARRAY['maintainer'::text, 'contributor'::text])) AND (p.archived_at IS NULL)))) OR (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = public.mediate_repository_owning_team(directories.repository_id)) AND (r.role = ANY (ARRAY['admin'::text, 'reviewer'::text])))))) AND (NOT (EXISTS ( SELECT 1
+   FROM ((((public.visibilities dm
+     JOIN public.teams o ON ((o.id = public.mediate_repository_owning_team(directories.repository_id))))
+     JOIN public.enterprises g ON ((g.id = o.enterprise_id)))
      JOIN public.users u ON ((u.id = current_setting('mediate.subject_id'::text, true))))
-     LEFT JOIN public.categories c ON (((c.name = ANY (m.categories)) AND c.specified)))
-  WHERE ((m.document_id = documents.id) AND ((documents.decontrol IS NULL) OR (documents.decontrol > (NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone)) AND (((('federal_only'::text = ANY (m.controls)) OR ('federal_only'::text = ANY (c.implied_controls))) AND (u.employment <> 'federal'::text)) OR ((('no_foreign'::text = ANY (m.controls)) OR ('no_foreign'::text = ANY (c.implied_controls))) AND (u.nationality <> g.nationality)) OR ((('releasable_to'::text = ANY (m.controls)) OR ('releasable_to'::text = ANY (c.implied_controls))) AND (NOT (u.nationality = ANY (m.releasable_to)))) OR ((('named_list'::text = ANY (m.controls)) OR ('named_list'::text = ANY (c.implied_controls))) AND (NOT (current_setting('mediate.subject_id'::text, true) = ANY (m.list))))))))))));
+     LEFT JOIN public.labels c ON (((c.name = ANY (directories.labels)) AND c.sensitive)))
+  WHERE ((dm.repository_id = directories.repository_id) AND ((public.mediate_repository_embargo(directories.repository_id) IS NULL) OR (public.mediate_repository_embargo(directories.repository_id) > (NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone)) AND (((('employees_only'::text = ANY (directories.restrictions)) OR ('employees_only'::text = ANY (c.implied_restrictions))) AND (u.employment <> 'employee'::text)) OR ((('export_controlled'::text = ANY (directories.restrictions)) OR ('export_controlled'::text = ANY (c.implied_restrictions))) AND (u.country <> g.country)) OR ((('releasable_to'::text = ANY (directories.restrictions)) OR ('releasable_to'::text = ANY (c.implied_restrictions))) AND (NOT (u.country = ANY (directories.releasable_to)))) OR ((('invite_only'::text = ANY (directories.restrictions)) OR ('invite_only'::text = ANY (c.implied_restrictions))) AND (NOT (current_setting('mediate.subject_id'::text, true) = ANY (dm.invited))))))))))));
 
 
 --
--- Name: portions mediate_scope_read; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories mediate_scope_read; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_read ON public.portions FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'read'::text) AND (((EXISTS ( SELECT 1
-   FROM (public.assignments a
-     JOIN public.programs p ON ((p.id = a.program_id)))
-  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.program_id = public.mediate_document_program(portions.document_id)) AND (a.role = ANY (ARRAY['lead'::text, 'member'::text])) AND (p.closed_at IS NULL)))) OR (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = public.mediate_document_office(portions.document_id)) AND (r.role = ANY (ARRAY['designator'::text, 'approver'::text])))))) AND (NOT (EXISTS ( SELECT 1
-   FROM ((((public.markings dm
-     JOIN public.offices o ON ((o.id = public.mediate_document_office(portions.document_id))))
-     JOIN public.agencies g ON ((g.id = o.agency_id)))
+CREATE POLICY mediate_scope_read ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'read'::text) AND (((EXISTS ( SELECT 1
+   FROM (public.memberships a
+     JOIN public.projects p ON ((p.id = a.project_id)))
+  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.project_id = repositories.project_id) AND (a.role = ANY (ARRAY['maintainer'::text, 'contributor'::text])) AND (p.archived_at IS NULL)))) OR (EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text, 'reviewer'::text])))))) AND (NOT (EXISTS ( SELECT 1
+   FROM ((((public.visibilities m
+     JOIN public.teams o ON ((o.id = repositories.owning_team_id)))
+     JOIN public.enterprises g ON ((g.id = o.enterprise_id)))
      JOIN public.users u ON ((u.id = current_setting('mediate.subject_id'::text, true))))
-     LEFT JOIN public.categories c ON (((c.name = ANY (portions.categories)) AND c.specified)))
-  WHERE ((dm.document_id = portions.document_id) AND ((public.mediate_document_decontrol(portions.document_id) IS NULL) OR (public.mediate_document_decontrol(portions.document_id) > (NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone)) AND (((('federal_only'::text = ANY (portions.controls)) OR ('federal_only'::text = ANY (c.implied_controls))) AND (u.employment <> 'federal'::text)) OR ((('no_foreign'::text = ANY (portions.controls)) OR ('no_foreign'::text = ANY (c.implied_controls))) AND (u.nationality <> g.nationality)) OR ((('releasable_to'::text = ANY (portions.controls)) OR ('releasable_to'::text = ANY (c.implied_controls))) AND (NOT (u.nationality = ANY (portions.releasable_to)))) OR ((('named_list'::text = ANY (portions.controls)) OR ('named_list'::text = ANY (c.implied_controls))) AND (NOT (current_setting('mediate.subject_id'::text, true) = ANY (dm.list))))))))))));
+     LEFT JOIN public.labels c ON (((c.name = ANY (m.labels)) AND c.sensitive)))
+  WHERE ((m.repository_id = repositories.id) AND ((repositories.embargo IS NULL) OR (repositories.embargo > (NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone)) AND (((('employees_only'::text = ANY (m.restrictions)) OR ('employees_only'::text = ANY (c.implied_restrictions))) AND (u.employment <> 'employee'::text)) OR ((('export_controlled'::text = ANY (m.restrictions)) OR ('export_controlled'::text = ANY (c.implied_restrictions))) AND (u.country <> g.country)) OR ((('releasable_to'::text = ANY (m.restrictions)) OR ('releasable_to'::text = ANY (c.implied_restrictions))) AND (NOT (u.country = ANY (m.releasable_to)))) OR ((('invite_only'::text = ANY (m.restrictions)) OR ('invite_only'::text = ANY (c.implied_restrictions))) AND (NOT (current_setting('mediate.subject_id'::text, true) = ANY (m.invited))))))))))));
 
 
 --
--- Name: documents mediate_scope_read_redacted; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories mediate_scope_set_embargo; Type: POLICY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_read_redacted ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'read_redacted'::text) AND ((EXISTS ( SELECT 1
-   FROM (public.assignments a
-     JOIN public.programs p ON ((p.id = a.program_id)))
-  WHERE ((a.user_id = current_setting('mediate.subject_id'::text, true)) AND (a.program_id = documents.program_id) AND (a.role = ANY (ARRAY['lead'::text, 'member'::text])) AND (p.closed_at IS NULL)))) OR (EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text, 'approver'::text]))))))));
+CREATE POLICY mediate_scope_set_embargo ON public.repositories FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'set_embargo'::text) AND ((EXISTS ( SELECT 1
+   FROM public.team_roles r
+  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.team_id = repositories.owning_team_id) AND (r.role = ANY (ARRAY['admin'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
 
 
 --
--- Name: documents mediate_scope_set_decontrol; Type: POLICY; Schema: public; Owner: mediate_owner
+-- Name: repositories; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
 --
 
-CREATE POLICY mediate_scope_set_decontrol ON public.documents FOR SELECT USING (((current_setting('mediate.operation'::text, true) = 'set_decontrol'::text) AND ((EXISTS ( SELECT 1
-   FROM public.office_roles r
-  WHERE ((r.user_id = current_setting('mediate.subject_id'::text, true)) AND (r.office_id = documents.designating_office_id) AND (r.role = ANY (ARRAY['designator'::text]))))) AND ((((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) >= '00:00:00'::interval) AND (((NULLIF(current_setting('mediate.now'::text, true), ''::text))::timestamp without time zone - (NULLIF(current_setting('mediate.reauthenticated_at'::text, true), ''::text))::timestamp without time zone) <= '00:15:00'::interval)))));
-
+ALTER TABLE public.repositories ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: portions; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
+-- Name: visibilities; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE public.portions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visibilities ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION mediate_document_decontrol(document bigint); Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: visibility_proposals; Type: ROW SECURITY; Schema: public; Owner: mediate_owner
 --
 
-REVOKE ALL ON FUNCTION public.mediate_document_decontrol(document bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.mediate_document_decontrol(document bigint) TO mediate_app;
-
+ALTER TABLE public.visibility_proposals ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: FUNCTION mediate_document_office(document bigint); Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: FUNCTION mediate_repository_embargo(repository bigint); Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-REVOKE ALL ON FUNCTION public.mediate_document_office(document bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.mediate_document_office(document bigint) TO mediate_app;
+REVOKE ALL ON FUNCTION public.mediate_repository_embargo(repository bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.mediate_repository_embargo(repository bigint) TO mediate_app;
 
 
 --
--- Name: FUNCTION mediate_document_program(document bigint); Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: FUNCTION mediate_repository_owning_team(repository bigint); Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-REVOKE ALL ON FUNCTION public.mediate_document_program(document bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.mediate_document_program(document bigint) TO mediate_app;
+REVOKE ALL ON FUNCTION public.mediate_repository_owning_team(repository bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.mediate_repository_owning_team(repository bigint) TO mediate_app;
+
+
+--
+-- Name: FUNCTION mediate_repository_project(repository bigint); Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+REVOKE ALL ON FUNCTION public.mediate_repository_project(repository bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.mediate_repository_project(repository bigint) TO mediate_app;
 
 
 --
@@ -1189,108 +1190,52 @@ GRANT SELECT,USAGE ON SEQUENCE public.account_roles_id_seq TO mediate_app;
 
 
 --
--- Name: TABLE agencies; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE directories; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.agencies TO mediate_app;
-
-
---
--- Name: SEQUENCE agencies_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.agencies_id_seq TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.directories TO mediate_app;
 
 
 --
--- Name: TABLE assignments; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: SEQUENCE directories_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.assignments TO mediate_app;
-
-
---
--- Name: SEQUENCE assignments_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.assignments_id_seq TO mediate_app;
+GRANT SELECT,USAGE ON SEQUENCE public.directories_id_seq TO mediate_app;
 
 
 --
--- Name: TABLE categories; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE enterprises; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.categories TO mediate_app;
-
-
---
--- Name: TABLE documents; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.documents TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.enterprises TO mediate_app;
 
 
 --
--- Name: SEQUENCE documents_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: SEQUENCE enterprises_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE public.documents_id_seq TO mediate_app;
-
-
---
--- Name: TABLE marking_proposals; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.marking_proposals TO mediate_app;
+GRANT SELECT,USAGE ON SEQUENCE public.enterprises_id_seq TO mediate_app;
 
 
 --
--- Name: SEQUENCE marking_proposals_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE labels; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE public.marking_proposals_id_seq TO mediate_app;
-
-
---
--- Name: TABLE markings; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.markings TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.labels TO mediate_app;
 
 
 --
--- Name: SEQUENCE markings_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE memberships; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE public.markings_id_seq TO mediate_app;
-
-
---
--- Name: TABLE office_roles; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.office_roles TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.memberships TO mediate_app;
 
 
 --
--- Name: SEQUENCE office_roles_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: SEQUENCE memberships_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE public.office_roles_id_seq TO mediate_app;
-
-
---
--- Name: TABLE offices; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.offices TO mediate_app;
-
-
---
--- Name: SEQUENCE offices_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.offices_id_seq TO mediate_app;
+GRANT SELECT,USAGE ON SEQUENCE public.memberships_id_seq TO mediate_app;
 
 
 --
@@ -1308,31 +1253,31 @@ GRANT SELECT,USAGE ON SEQUENCE public.override_reports_id_seq TO mediate_app;
 
 
 --
--- Name: TABLE portions; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE projects; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.portions TO mediate_app;
-
-
---
--- Name: SEQUENCE portions_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.portions_id_seq TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.projects TO mediate_app;
 
 
 --
--- Name: TABLE programs; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: SEQUENCE projects_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.programs TO mediate_app;
+GRANT SELECT,USAGE ON SEQUENCE public.projects_id_seq TO mediate_app;
 
 
 --
--- Name: SEQUENCE programs_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+-- Name: TABLE repositories; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-GRANT SELECT,USAGE ON SEQUENCE public.programs_id_seq TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.repositories TO mediate_app;
+
+
+--
+-- Name: SEQUENCE repositories_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.repositories_id_seq TO mediate_app;
 
 
 --
@@ -1343,10 +1288,66 @@ GRANT SELECT ON TABLE public.schema_migrations TO mediate_app;
 
 
 --
+-- Name: TABLE team_roles; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.team_roles TO mediate_app;
+
+
+--
+-- Name: SEQUENCE team_roles_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.team_roles_id_seq TO mediate_app;
+
+
+--
+-- Name: TABLE teams; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.teams TO mediate_app;
+
+
+--
+-- Name: SEQUENCE teams_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.teams_id_seq TO mediate_app;
+
+
+--
 -- Name: TABLE users; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.users TO mediate_app;
+
+
+--
+-- Name: TABLE visibilities; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.visibilities TO mediate_app;
+
+
+--
+-- Name: SEQUENCE visibilities_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.visibilities_id_seq TO mediate_app;
+
+
+--
+-- Name: TABLE visibility_proposals; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.visibility_proposals TO mediate_app;
+
+
+--
+-- Name: SEQUENCE visibility_proposals_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.visibility_proposals_id_seq TO mediate_app;
 
 
 --

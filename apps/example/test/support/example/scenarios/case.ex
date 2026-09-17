@@ -14,7 +14,7 @@ defmodule Example.Scenarios.Case do
 
       use Example.Scenarios.Case
 
-      scenario "enf-01", "A User with an Assignment to a Document's Program reads it", rule: :c1 do
+      scenario "enf-01", "A User with a Membership in a Repository's Project reads it", rule: :c1 do
         ...
       end
   """

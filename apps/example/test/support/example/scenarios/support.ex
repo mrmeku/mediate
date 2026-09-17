@@ -5,8 +5,8 @@ defmodule Example.Scenarios.Support do
 
   import ExUnit.Assertions
 
-  alias Example.Application.Documents
-  alias Example.Domain.Document
+  alias Example.Application.Repositories
+  alias Example.Domain.Repository
   alias Example.Domain.Sessions
   alias Example.Fixture
   alias Mediate.Error
@@ -15,22 +15,22 @@ defmodule Example.Scenarios.Support do
   @spec subject(String.t()) :: Mediate.subject()
   defdelegate subject(id), to: Fixture
 
-  @doc "Whether the port allows `read` on the document."
-  @spec reads?(Mediate.subject(), Document.t()) :: boolean()
-  def reads?({_kind, _account} = subject, %Document{id: id}), do: Mediate.check(subject, :read, Documents.object(id))
+  @doc "Whether the port allows `read` on the repository."
+  @spec reads?(Mediate.subject(), Repository.t()) :: boolean()
+  def reads?({_kind, _account} = subject, %Repository{id: id}), do: Mediate.check(subject, :read, Repositories.object(id))
 
-  @doc "Assert the context read the document."
-  @spec assert_read(Mediate.subject(), Document.t(), keyword()) :: Document.t()
-  def assert_read({_kind, _account} = subject, %Document{id: id}, opts \\ []) do
-    assert {:ok, %Document{id: ^id} = read} = Documents.read(subject, id, opts)
+  @doc "Assert the context read the repository."
+  @spec assert_read(Mediate.subject(), Repository.t(), keyword()) :: Repository.t()
+  def assert_read({_kind, _account} = subject, %Repository{id: id}, opts \\ []) do
+    assert {:ok, %Repository{id: ^id} = read} = Repositories.read(subject, id, opts)
     read
   end
 
   @doc "Assert the context refused the read with the port's error."
-  @spec assert_denied(Mediate.subject(), Document.t(), keyword()) :: Error.t()
-  def assert_denied({_kind, _account} = subject, %Document{id: id}, opts \\ []) do
-    error = assert_refused(Documents.read(subject, id, opts), :read)
-    refute reads?(subject, %Document{id: id})
+  @spec assert_denied(Mediate.subject(), Repository.t(), keyword()) :: Error.t()
+  def assert_denied({_kind, _account} = subject, %Repository{id: id}, opts \\ []) do
+    error = assert_refused(Repositories.read(subject, id, opts), :read)
+    refute reads?(subject, %Repository{id: id})
     error
   end
 

@@ -9,10 +9,10 @@ defmodule ExamplePostgres.Repo.Migrations.Rules do
   @version 20_260_909_000_005
   @app Policies.app_role()
   @owner Policies.owner_role()
-  @documents "documents"
-  @markings "markings"
-  @portions "portions"
-  @proposals "marking_proposals"
+  @repositories "repositories"
+  @visibilities "visibilities"
+  @directories "directories"
+  @proposals "visibility_proposals"
 
   def up do
     repo = repo()
@@ -20,9 +20,9 @@ defmodule ExamplePostgres.Repo.Migrations.Rules do
     Enum.each(Policies.accessors(), &execute/1)
     flush()
     Enum.each(Policies.protected(), &Migration.protect!(repo, &1))
-    documents(repo)
-    markings(repo)
-    portions(repo)
+    repositories(repo)
+    visibilities(repo)
+    directories(repo)
     proposals(repo)
     :ok = Migration.grant!(repo, table: "schema_migrations", to: @app, commands: [:select])
     _version = Migration.publish!(repo, published())
@@ -39,46 +39,47 @@ defmodule ExamplePostgres.Repo.Migrations.Rules do
     :ok
   end
 
-  # A document answers `read` under every rule and `read_redacted` under
-  # lawful purpose alone; the marking operations reach it through the
-  # designating office, and the three that write it carry the gate as well.
-  defp documents(repo) do
-    scope(repo, @documents, :read, Policies.document_read(Policies.readers()))
-    scope(repo, @documents, :read_redacted, Policies.document_read_redacted())
-    Enum.each([:change_marking, :set_decontrol, :decontrol], &scope(repo, @documents, &1, Policies.document_marks()))
-    scope(repo, @documents, :propose_marking, Policies.document_designator())
-    scope(repo, @documents, :approve_marking, Policies.document_approver())
-    Enum.each([:change_marking, :set_decontrol, :decontrol], &gate(repo, @documents, &1, Policies.document_marks()))
-    exempt(repo, @documents, [:select, :insert])
+  # A repository answers `read` under every rule and `checkout` under
+  # access path alone; the visibility operations reach it through the
+  # owning team, and the three that write it carry the gate as well.
+  defp repositories(repo) do
+    scope(repo, @repositories, :read, Policies.repository_read(Policies.readers()))
+    scope(repo, @repositories, :checkout, Policies.repository_checkout())
+    writes = [:change_visibility, :set_embargo, :lift_embargo]
+    Enum.each(writes, &scope(repo, @repositories, &1, Policies.repository_visibility()))
+    scope(repo, @repositories, :propose_visibility, Policies.repository_admin())
+    scope(repo, @repositories, :approve_visibility, Policies.repository_reviewer())
+    Enum.each(writes, &gate(repo, @repositories, &1, Policies.repository_visibility()))
+    exempt(repo, @repositories, [:select, :insert])
   end
 
-  # The banner is reached through its document, whose policy is what admits
-  # the read, so every read of a marking is admitted here and the two write
-  # gates are what the table enforces: the designator's change, and the
+  # The rollup is reached through its repository, whose policy is what admits
+  # the read, so every read of a visibility is admitted here and the two write
+  # gates are what the table enforces: the admin's change, and the
   # approval of somebody else's proposal.
-  defp markings(repo) do
-    :ok = Migration.admit!(repo, table: @markings, command: :select)
-    gate(repo, @markings, :change_marking, Policies.marking_marks())
-    gate(repo, @markings, :approve_marking, Policies.marking_approves())
-    :ok = Migration.exempt!(repo, table: @markings, to: @app, commands: [:insert, :update])
+  defp visibilities(repo) do
+    :ok = Migration.admit!(repo, table: @visibilities, command: :select)
+    gate(repo, @visibilities, :change_visibility, Policies.visibility_write())
+    gate(repo, @visibilities, :approve_visibility, Policies.visibility_approval())
+    :ok = Migration.exempt!(repo, table: @visibilities, to: @app, commands: [:insert, :update])
   end
 
-  defp portions(repo) do
-    scope(repo, @portions, :read, Policies.portion_read())
-    scope(repo, @portions, :change_marking, Policies.portion_marks())
-    gate(repo, @portions, :change_marking, Policies.portion_marks())
-    exempt(repo, @portions, [:select, :insert])
+  defp directories(repo) do
+    scope(repo, @directories, :read, Policies.directory_read())
+    scope(repo, @directories, :change_visibility, Policies.directory_visibility())
+    gate(repo, @directories, :change_visibility, Policies.directory_visibility())
+    exempt(repo, @directories, [:select, :insert])
   end
 
   defp proposals(repo) do
-    scope(repo, @proposals, :propose_marking, Policies.proposal_proposer())
-    scope(repo, @proposals, :approve_marking, Policies.proposal_approver())
-    gate(repo, @proposals, :approve_marking, Policies.proposal_approver())
+    scope(repo, @proposals, :propose_visibility, Policies.proposal_proposer())
+    scope(repo, @proposals, :approve_visibility, Policies.proposal_reviewer())
+    gate(repo, @proposals, :approve_visibility, Policies.proposal_reviewer())
 
     :ok =
       Migration.gate!(repo,
         table: @proposals,
-        operation: :propose_marking,
+        operation: :propose_visibility,
         command: :insert,
         with_check: Policies.proposal_written()
       )

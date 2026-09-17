@@ -11,90 +11,91 @@ type employment
   relations
     define member: [user]
 
-type agency
+type enterprise
   relations
-    define domestic: [country]
-    define federal: [employment]
-    define domestic_member: member from domestic
-    define federal_member: member from federal
+    define home: [country]
+    define employee: [employment]
+    define home_member: member from home
+    define employee_member: member from employee
 
-type office
+type team
   relations
-    define agency: [agency]
-    define designator: [user]
-    define approver: [user]
-    define member: designator or approver
-    define domestic_member: domestic_member from agency
-    define federal_member: federal_member from agency
+    define enterprise: [enterprise]
+    define admin: [user]
+    define reviewer: [user]
+    define member: admin or reviewer
+    define home_member: home_member from enterprise
+    define employee_member: employee_member from enterprise
 
-type program
+type project
   relations
-    define lead: [user]
-    define member: [user] or lead
+    define maintainer: [user]
+    define contributor: [user]
+    define member: contributor or maintainer
 
-type category
+type label
   relations
-    define fedonly_applies: [user:*]
-    define noforn_applies: [user:*]
+    define employee_applies: [user:*]
+    define export_applies: [user:*]
 
-type document
+type repository
   relations
-    define program: [program]
-    define designating_office: [office]
-    define portion: [portion]
-    define category: [category, category with before_decontrol]
-    define listed: [user]
+    define project: [project]
+    define owning_team: [team]
+    define directory: [directory]
+    define label: [label, label with under_embargo]
+    define invited: [user]
     define releasable_to: [country]
 
-    define fedonly_applies: [user:*, user:* with before_decontrol] or fedonly_applies from category or fedonly_applies from portion
-    define noforn_applies: [user:*, user:* with before_decontrol] or noforn_applies from category or noforn_applies from portion
-    define relto_applies: [user:*, user:* with before_decontrol] or relto_applies from portion
-    define list_applies: [user:*, user:* with before_decontrol] or list_applies from portion
+    define employee_applies: [user:*, user:* with under_embargo] or employee_applies from label or employee_applies from directory
+    define export_applies: [user:*, user:* with under_embargo] or export_applies from label or export_applies from directory
+    define regions_applies: [user:*, user:* with under_embargo] or regions_applies from directory
+    define invite_applies: [user:*, user:* with under_embargo] or invite_applies from directory
 
-    define lawful_purpose: member from program or member from designating_office
-    define fedonly_clear: federal_member from designating_office
-    define noforn_clear: domestic_member from designating_office
-    define relto_clear: member from releasable_to
+    define access_path: member from project or member from owning_team
+    define employee_clear: employee_member from owning_team
+    define export_clear: home_member from owning_team
+    define regions_clear: member from releasable_to
 
-    define blocked_by_fedonly: fedonly_applies but not fedonly_clear
-    define blocked_by_noforn: noforn_applies but not noforn_clear
-    define blocked_by_relto: relto_applies but not relto_clear
-    define blocked_by_list: list_applies but not listed
-    define blocked: blocked_by_fedonly or blocked_by_noforn or blocked_by_relto or blocked_by_list
+    define blocked_by_employee: employee_applies but not employee_clear
+    define blocked_by_export: export_applies but not export_clear
+    define blocked_by_regions: regions_applies but not regions_clear
+    define blocked_by_invite: invite_applies but not invited
+    define blocked: blocked_by_employee or blocked_by_export or blocked_by_regions or blocked_by_invite
 
-    define can_read: lawful_purpose but not blocked
-    define can_read_redacted: lawful_purpose
-    define can_change_marking: designator from designating_office
-    define can_set_decontrol: can_change_marking
-    define can_decontrol: can_change_marking
-    define can_propose_marking: can_change_marking
+    define can_read: access_path but not blocked
+    define can_checkout: access_path
+    define can_change_visibility: admin from owning_team
+    define can_set_embargo: can_change_visibility
+    define can_lift_embargo: can_change_visibility
+    define can_propose_visibility: can_change_visibility
 
-type portion
+type directory
   relations
-    define document: [document]
-    define category: [category, category with before_decontrol]
-    define listed: listed from document
+    define repository: [repository]
+    define label: [label, label with under_embargo]
+    define invited: invited from repository
     define releasable_to: [country]
 
-    define fedonly_applies: [user:*, user:* with before_decontrol] or fedonly_applies from category
-    define noforn_applies: [user:*, user:* with before_decontrol] or noforn_applies from category
-    define relto_applies: [user:*, user:* with before_decontrol]
-    define list_applies: [user:*, user:* with before_decontrol]
+    define employee_applies: [user:*, user:* with under_embargo] or employee_applies from label
+    define export_applies: [user:*, user:* with under_embargo] or export_applies from label
+    define regions_applies: [user:*, user:* with under_embargo]
+    define invite_applies: [user:*, user:* with under_embargo]
 
-    define fedonly_clear: fedonly_clear from document
-    define noforn_clear: noforn_clear from document
-    define relto_clear: member from releasable_to
+    define employee_clear: employee_clear from repository
+    define export_clear: export_clear from repository
+    define regions_clear: member from releasable_to
 
-    define blocked: (fedonly_applies but not fedonly_clear) or (noforn_applies but not noforn_clear) or (relto_applies but not relto_clear) or (list_applies but not listed)
-    define can_read: can_read_redacted from document but not blocked
-    define can_change_marking: can_change_marking from document
+    define blocked: (employee_applies but not employee_clear) or (export_applies but not export_clear) or (regions_applies but not regions_clear) or (invite_applies but not invited)
+    define can_read: can_checkout from repository but not blocked
+    define can_change_visibility: can_change_visibility from repository
 
 type proposal
   relations
-    define office: [office]
+    define team: [team]
     define proposer: [user]
-    define can_approve_marking: approver from office but not proposer
+    define can_approve_visibility: reviewer from team but not proposer
 
-condition before_decontrol(decontrol_at: timestamp, current_time: timestamp) {
-  current_time < decontrol_at
+condition under_embargo(lifts_at: timestamp, current_time: timestamp) {
+  current_time < lifts_at
 }

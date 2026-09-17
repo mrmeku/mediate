@@ -22,9 +22,9 @@ defmodule Example.Infrastructure.Migration do
             ]
           )
 
-  @serial_tables ~w(agencies offices programs account_roles assignments office_roles documents markings portions
-    marking_proposals override_reports)a
-  @keyed_tables ~w(users categories)a
+  @serial_tables ~w(enterprises teams projects account_roles memberships team_roles repositories visibilities directories
+    visibility_proposals override_reports)a
+  @keyed_tables ~w(users labels)a
 
   @doc "Create the domain tables and the grants. Options: #{NimbleOptions.docs(@schema)}"
   @spec up(keyword()) :: :ok
@@ -33,7 +33,7 @@ defmodule Example.Infrastructure.Migration do
     tenancy()
     accounts()
     roles()
-    documents()
+    repositories()
     proposals_and_reports()
     grants(options[:app_role])
     :ok
@@ -51,26 +51,26 @@ defmodule Example.Infrastructure.Migration do
   end
 
   defp tenancy do
-    create table(:agencies) do
+    create table(:enterprises) do
       add :name, :text, null: false
-      add :nationality, :text, null: false
+      add :country, :text, null: false
     end
 
-    create table(:offices) do
+    create table(:teams) do
       add :name, :text, null: false
-      add :agency_id, references(:agencies), null: false
+      add :enterprise_id, references(:enterprises), null: false
     end
 
-    create table(:programs) do
+    create table(:projects) do
       add :name, :text, null: false
-      add :closed_at, :utc_datetime
-      add :office_id, references(:offices), null: false
+      add :archived_at, :utc_datetime
+      add :team_id, references(:teams), null: false
     end
 
-    create table(:categories, primary_key: false) do
+    create table(:labels, primary_key: false) do
       add :name, :text, primary_key: true
-      add :specified, :boolean, null: false, default: false
-      add :implied_controls, {:array, :text}, null: false, default: []
+      add :sensitive, :boolean, null: false, default: false
+      add :implied_restrictions, {:array, :text}, null: false, default: []
     end
   end
 
@@ -81,7 +81,7 @@ defmodule Example.Infrastructure.Migration do
       add :kind, :text, null: false
       add :person_id, :text, null: false
       add :employment, :text, null: false
-      add :nationality, :text, null: false
+      add :country, :text, null: false
     end
 
     create table(:account_roles) do
@@ -93,65 +93,66 @@ defmodule Example.Infrastructure.Migration do
   end
 
   defp roles do
-    create table(:assignments) do
+    create table(:memberships) do
       add :user_id, references(:users, type: :text), null: false
-      add :program_id, references(:programs), null: false
+      add :project_id, references(:projects), null: false
       add :role, :text, null: false
     end
 
-    create unique_index(:assignments, [:user_id, :program_id])
+    create unique_index(:memberships, [:user_id, :project_id])
 
-    create table(:office_roles) do
+    create table(:team_roles) do
       add :user_id, references(:users, type: :text), null: false
-      add :office_id, references(:offices), null: false
+      add :team_id, references(:teams), null: false
       add :role, :text, null: false
     end
 
-    create unique_index(:office_roles, [:user_id, :office_id, :role])
+    create unique_index(:team_roles, [:user_id, :team_id, :role])
   end
 
-  defp documents do
-    create table(:documents) do
-      add :title, :text, null: false
-      add :decontrol, :utc_datetime
-      add :program_id, references(:programs), null: false
-      add :designating_office_id, references(:offices), null: false
+  defp repositories do
+    create table(:repositories) do
+      add :name, :text, null: false
+      add :embargo, :utc_datetime
+      add :project_id, references(:projects), null: false
+      add :owning_team_id, references(:teams), null: false
     end
 
-    create table(:markings) do
-      add :document_id, references(:documents), null: false
-      add :categories, {:array, :text}, null: false, default: []
-      add :controls, {:array, :text}, null: false, default: []
+    create table(:visibilities) do
+      add :repository_id, references(:repositories), null: false
+      add :labels, {:array, :text}, null: false, default: []
+      add :restrictions, {:array, :text}, null: false, default: []
       add :releasable_to, {:array, :text}, null: false, default: []
-      add :list, {:array, :text}, null: false, default: []
+      add :invited, {:array, :text}, null: false, default: []
     end
 
-    create unique_index(:markings, [:document_id])
+    create unique_index(:visibilities, [:repository_id])
 
-    create table(:portions) do
-      add :document_id, references(:documents), null: false
-      add :body, :text, null: false
-      add :categories, {:array, :text}, null: false, default: []
-      add :controls, {:array, :text}, null: false, default: []
+    create table(:directories) do
+      add :repository_id, references(:repositories), null: false
+      add :name, :text, null: false
+      add :contents, :text, null: false
+      add :labels, {:array, :text}, null: false, default: []
+      add :restrictions, {:array, :text}, null: false, default: []
       add :releasable_to, {:array, :text}, null: false, default: []
     end
   end
 
   defp proposals_and_reports do
-    create table(:marking_proposals) do
-      add :document_id, references(:documents), null: false
+    create table(:visibility_proposals) do
+      add :repository_id, references(:repositories), null: false
       add :proposer_id, references(:users, type: :text), null: false
-      add :approver_id, references(:users, type: :text)
+      add :reviewer_id, references(:users, type: :text)
       add :status, :text, null: false, default: "pending"
-      add :categories, {:array, :text}, null: false, default: []
-      add :controls, {:array, :text}, null: false, default: []
+      add :labels, {:array, :text}, null: false, default: []
+      add :restrictions, {:array, :text}, null: false, default: []
       add :releasable_to, {:array, :text}, null: false, default: []
-      add :list, {:array, :text}, null: false, default: []
+      add :invited, {:array, :text}, null: false, default: []
     end
 
     create table(:override_reports) do
-      add :document_id, references(:documents), null: false
-      add :office_id, references(:offices), null: false
+      add :repository_id, references(:repositories), null: false
+      add :team_id, references(:teams), null: false
       add :user_id, references(:users, type: :text), null: false
       add :justification, :text, null: false
       add :operation_id, :text, null: false

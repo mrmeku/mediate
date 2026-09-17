@@ -12,26 +12,26 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   fact the caller supplies. A setting the caller did not supply reads as
   `NULL`. A predicate over `NULL` is not true, so an absent fact denies.
 
-  A policy on `portions` reads its document's program, designating office,
-  and decontrol date through the accessor functions, not through
-  `documents`. Under the `read` operation the document's own policy narrows
-  every reference to that table. Through `documents`, a portion of a
-  document the banner blocks disappears with its document. The accessors run
+  A policy on `directories` reads its repository's project, owning team,
+  and embargo date through the accessor functions, not through
+  `repositories`. Under the `read` operation the repository's own policy narrows
+  every reference to that table. Through `repositories`, a directory of a
+  repository the rollup blocks disappears with its repository. The accessors run
   as the table's owner, whose reads the owner's exemption policy admits. So
-  the portion answers under its own marking.
+  the directory answers under its own visibility.
   """
 
-  alias Example.Domain.Agency
-  alias Example.Domain.Assignment
-  alias Example.Domain.Category
-  alias Example.Domain.Document
-  alias Example.Domain.Marking
-  alias Example.Domain.Office
-  alias Example.Domain.OfficeRole
-  alias Example.Domain.Portion
-  alias Example.Domain.Program
+  alias Example.Domain.Directory
+  alias Example.Domain.Enterprise
+  alias Example.Domain.Label
+  alias Example.Domain.Membership
+  alias Example.Domain.Project
   alias Example.Domain.Proposal
+  alias Example.Domain.Repository
+  alias Example.Domain.Team
+  alias Example.Domain.TeamRole
   alias Example.Domain.User
+  alias Example.Domain.Visibility
 
   @app_role "mediate_app"
   @owner_role "mediate_owner"
@@ -42,25 +42,25 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   @window "interval '900 seconds'"
   @fresh "(#{@now} - #{@reauthenticated}) BETWEEN interval '0 second' AND #{@window}"
 
-  @program "mediate_document_program"
-  @office "mediate_document_office"
-  @decontrol "mediate_document_decontrol"
+  @project "mediate_repository_project"
+  @team "mediate_repository_owning_team"
+  @embargo "mediate_repository_embargo"
 
   @accessors [
-    {@program, "bigint", "program_id"},
-    {@office, "bigint", "designating_office_id"},
-    {@decontrol, "timestamp", "decontrol"}
+    {@project, "bigint", "project_id"},
+    {@team, "bigint", "owning_team_id"},
+    {@embargo, "timestamp", "embargo"}
   ]
 
-  @controls ~w(federal_only no_foreign releasable_to named_list)
-  @readers ~w(lead member)
-  @designator ~w(designator)
-  @approver ~w(approver)
-  @office_readers ~w(designator approver)
+  @restrictions ~w(employees_only export_controlled releasable_to invite_only)
+  @readers ~w(maintainer contributor)
+  @admin ~w(admin)
+  @reviewer ~w(reviewer)
+  @team_readers ~w(admin reviewer)
 
   @doc "The tables the policies protect. A published version carries the policies of these tables."
   @spec protected() :: [String.t()]
-  def protected, do: ~w(documents markings portions marking_proposals)
+  def protected, do: ~w(repositories visibilities directories visibility_proposals)
 
   @doc """
   The schemas the binding names: the four whose tables the policies
@@ -69,7 +69,7 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   """
   @spec schemas() :: [module()]
   def schemas do
-    [Document, Marking, Portion, Proposal, Agency, Assignment, Category, Office, OfficeRole, Program, User]
+    [Repository, Visibility, Directory, Proposal, Enterprise, Membership, Label, Team, TeamRole, Project, User]
   end
 
   @doc "The database role the application connects as."
@@ -80,11 +80,11 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   @spec owner_role() :: String.t()
   def owner_role, do: @owner_role
 
-  @doc "The assignment roles that reach a document at all, which is every one of them."
+  @doc "The membership roles that reach a repository at all, which is every one of them."
   @spec readers() :: [String.t()]
   def readers, do: @readers
 
-  @doc "The accessor functions a policy on `portions` reads its document through, with their grants."
+  @doc "The accessor functions a policy on `directories` reads its repository through, with their grants."
   @spec accessors() :: [String.t()]
   def accessors, do: Enum.flat_map(@accessors, &accessor/1)
 
@@ -92,75 +92,75 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   @spec accessor_drops() :: [String.t()]
   def accessor_drops, do: Enum.map(@accessors, fn {name, _type, _column} -> "DROP FUNCTION #{name}(bigint)" end)
 
-  @doc "The `SELECT` policy of `read` on `documents`, for the assignment roles that hold it."
-  @spec document_read([String.t()]) :: String.t()
-  def document_read(roles) when is_list(roles) do
-    "(#{document_purpose(roles)}) AND NOT (#{document_blocked()})"
+  @doc "The `SELECT` policy of `read` on `repositories`, for the membership roles that hold it."
+  @spec repository_read([String.t()]) :: String.t()
+  def repository_read(roles) when is_list(roles) do
+    "(#{repository_access_path(roles)}) AND NOT (#{repository_blocked()})"
   end
 
-  @doc "The `SELECT` policy of `read_redacted` on `documents`: lawful purpose alone."
-  @spec document_read_redacted() :: String.t()
-  def document_read_redacted, do: document_purpose(@readers)
+  @doc "The `SELECT` policy of `checkout` on `repositories`: access path alone."
+  @spec repository_checkout() :: String.t()
+  def repository_checkout, do: repository_access_path(@readers)
 
-  @doc "A designator of the designating office."
-  @spec document_designator() :: String.t()
-  def document_designator, do: holds("documents.designating_office_id", @designator)
+  @doc "An admin of the owning team."
+  @spec repository_admin() :: String.t()
+  def repository_admin, do: holds("repositories.owning_team_id", @admin)
 
-  @doc "An approver of the designating office."
-  @spec document_approver() :: String.t()
-  def document_approver, do: holds("documents.designating_office_id", @approver)
+  @doc "A reviewer of the owning team."
+  @spec repository_reviewer() :: String.t()
+  def repository_reviewer, do: holds("repositories.owning_team_id", @reviewer)
 
-  @doc "A designator of the designating office in a session that re-authenticated inside the window."
-  @spec document_marks() :: String.t()
-  def document_marks, do: "(#{document_designator()}) AND (#{@fresh})"
+  @doc "An admin of the owning team in a session that re-authenticated inside the window."
+  @spec repository_visibility() :: String.t()
+  def repository_visibility, do: "(#{repository_admin()}) AND (#{@fresh})"
 
-  @doc "The `SELECT` policy of `read` on `portions`: the document's purpose and the portion's own marking."
-  @spec portion_read() :: String.t()
-  def portion_read, do: "(#{portion_purpose()}) AND NOT (#{portion_blocked()})"
+  @doc "The `SELECT` policy of `read` on `directories`: the repository's access path and the directory's own visibility."
+  @spec directory_read() :: String.t()
+  def directory_read, do: "(#{directory_access_path()}) AND NOT (#{directory_blocked()})"
 
-  @doc "A designator of the portion's document's office in a fresh session."
-  @spec portion_marks() :: String.t()
-  def portion_marks do
-    "(#{holds("#{@office}(portions.document_id)", @designator)}) AND (#{@fresh})"
+  @doc "An admin of the directory's repository's team in a fresh session."
+  @spec directory_visibility() :: String.t()
+  def directory_visibility do
+    "(#{holds("#{@team}(directories.repository_id)", @admin)}) AND (#{@fresh})"
   end
 
-  @doc "A designator of the document's office, the subject that can propose."
+  @doc "An admin of the repository's team, the subject that can propose."
   @spec proposal_proposer() :: String.t()
-  def proposal_proposer, do: holds("#{@office}(marking_proposals.document_id)", @designator)
+  def proposal_proposer, do: holds("#{@team}(visibility_proposals.repository_id)", @admin)
 
-  @doc "An approver of the document's office who is not the proposer."
-  @spec proposal_approver() :: String.t()
-  def proposal_approver do
-    approver = holds("#{@office}(marking_proposals.document_id)", @approver)
-    "(#{approver}) AND marking_proposals.proposer_id <> #{@subject}"
+  @doc "A reviewer of the repository's team who is not the proposer."
+  @spec proposal_reviewer() :: String.t()
+  def proposal_reviewer do
+    reviewer = holds("#{@team}(visibility_proposals.repository_id)", @reviewer)
+    "(#{reviewer}) AND visibility_proposals.proposer_id <> #{@subject}"
   end
 
-  @doc "The row a proposal insert can write: the subject's own, on a document the subject designates."
+  @doc "The row a proposal insert can write: the subject's own, on a repository the subject names."
   @spec proposal_written() :: String.t()
   def proposal_written do
-    "(#{proposal_proposer()}) AND marking_proposals.proposer_id = #{@subject}"
+    "(#{proposal_proposer()}) AND visibility_proposals.proposer_id = #{@subject}"
   end
 
-  @doc "The banner a designator can write in a fresh session."
-  @spec marking_marks() :: String.t()
-  def marking_marks do
-    "(#{holds("#{@office}(markings.document_id)", @designator)}) AND (#{@fresh})"
+  @doc "The rollup an admin can write in a fresh session."
+  @spec visibility_write() :: String.t()
+  def visibility_write do
+    "(#{holds("#{@team}(visibilities.repository_id)", @admin)}) AND (#{@fresh})"
   end
 
   @doc """
-  The banner an approval can write: an approver of the document's office
-  writes it, and a pending proposal on that document from somebody else
-  exists. The approval writes the proposal's own row after its document's,
+  The rollup an approval can write: a reviewer of the repository's team
+  writes it, and a pending proposal on that repository from somebody else
+  exists. The approval writes the proposal's own row after its repository's,
   so at this moment the proposal is still pending.
   """
-  @spec marking_approves() :: String.t()
-  def marking_approves do
-    approver = holds("#{@office}(markings.document_id)", @approver)
+  @spec visibility_approval() :: String.t()
+  def visibility_approval do
+    reviewer = holds("#{@team}(visibilities.repository_id)", @reviewer)
 
     """
-    (#{approver}) AND EXISTS (
-      SELECT 1 FROM marking_proposals p
-      WHERE p.document_id = markings.document_id
+    (#{reviewer}) AND EXISTS (
+      SELECT 1 FROM visibility_proposals p
+      WHERE p.repository_id = visibilities.repository_id
         AND p.status = 'pending'
         AND p.proposer_id <> #{@subject}
     )
@@ -170,99 +170,99 @@ defmodule ExamplePostgres.Infrastructure.Policies do
   defp accessor({name, type, column}) do
     [
       """
-      CREATE FUNCTION #{name}(document bigint) RETURNS #{type}
+      CREATE FUNCTION #{name}(repository bigint) RETURNS #{type}
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
-        AS 'SELECT #{column} FROM documents WHERE id = document'
+        AS 'SELECT #{column} FROM repositories WHERE id = repository'
       """,
       "REVOKE EXECUTE ON FUNCTION #{name}(bigint) FROM PUBLIC",
       "GRANT EXECUTE ON FUNCTION #{name}(bigint) TO #{@app_role}, #{@owner_role}"
     ]
   end
 
-  # Lawful purpose: an assignment to the document's program while that
-  # program has not closed, or a role in the office that designated it.
-  defp document_purpose(roles) do
-    "#{assigned("documents.program_id", roles)} OR #{holds("documents.designating_office_id", @office_readers)}"
+  # Access path: a membership to the repository's project while that
+  # project is not archived, or a role in the team that owns it.
+  defp repository_access_path(roles) do
+    "#{assigned("repositories.project_id", roles)} OR #{holds("repositories.owning_team_id", @team_readers)}"
   end
 
-  defp portion_purpose do
-    assigned = assigned("#{@program}(portions.document_id)", @readers)
-    "#{assigned} OR #{holds("#{@office}(portions.document_id)", @office_readers)}"
+  defp directory_access_path do
+    assigned = assigned("#{@project}(directories.repository_id)", @readers)
+    "#{assigned} OR #{holds("#{@team}(directories.repository_id)", @team_readers)}"
   end
 
-  defp assigned(program, roles) do
+  defp assigned(project, roles) do
     """
     EXISTS (
-      SELECT 1 FROM assignments a
-      JOIN programs p ON p.id = a.program_id
+      SELECT 1 FROM memberships a
+      JOIN projects p ON p.id = a.project_id
       WHERE a.user_id = #{@subject}
-        AND a.program_id = #{program}
+        AND a.project_id = #{project}
         AND a.role = ANY (ARRAY[#{quoted(roles)}])
-        AND p.closed_at IS NULL
+        AND p.archived_at IS NULL
     )
     """
   end
 
-  defp holds(office, roles) do
+  defp holds(team, roles) do
     """
     EXISTS (
-      SELECT 1 FROM office_roles r
+      SELECT 1 FROM team_roles r
       WHERE r.user_id = #{@subject}
-        AND r.office_id = #{office}
+        AND r.team_id = #{team}
         AND r.role = ANY (ARRAY[#{quoted(roles)}])
     )
     """
   end
 
-  # Until the document's decontrol date, an effective control of its banner
+  # Until the repository's embargo date, an effective restriction of its rollup
   # that the subject does not clear.
-  defp document_blocked do
+  defp repository_blocked do
     """
     EXISTS (
       SELECT 1
-      FROM markings m
-      JOIN offices o ON o.id = documents.designating_office_id
-      JOIN agencies g ON g.id = o.agency_id
+      FROM visibilities m
+      JOIN teams o ON o.id = repositories.owning_team_id
+      JOIN enterprises g ON g.id = o.enterprise_id
       JOIN users u ON u.id = #{@subject}
-      LEFT JOIN categories c ON c.name = ANY (m.categories) AND c.specified
-      WHERE m.document_id = documents.id
-        AND (documents.decontrol IS NULL OR documents.decontrol > #{@now})
+      LEFT JOIN labels c ON c.name = ANY (m.labels) AND c.sensitive
+      WHERE m.repository_id = repositories.id
+        AND (repositories.embargo IS NULL OR repositories.embargo > #{@now})
         AND (#{fails("m", "m")})
     )
     """
   end
 
-  # The same on a portion: its own controls and categories, under its
-  # document's list and decontrol date.
-  defp portion_blocked do
+  # The same on a directory: its own restrictions and labels, under its
+  # repository's list and embargo date.
+  defp directory_blocked do
     """
     EXISTS (
       SELECT 1
-      FROM markings dm
-      JOIN offices o ON o.id = #{@office}(portions.document_id)
-      JOIN agencies g ON g.id = o.agency_id
+      FROM visibilities dm
+      JOIN teams o ON o.id = #{@team}(directories.repository_id)
+      JOIN enterprises g ON g.id = o.enterprise_id
       JOIN users u ON u.id = #{@subject}
-      LEFT JOIN categories c ON c.name = ANY (portions.categories) AND c.specified
-      WHERE dm.document_id = portions.document_id
-        AND (#{@decontrol}(portions.document_id) IS NULL OR #{@decontrol}(portions.document_id) > #{@now})
-        AND (#{fails("portions", "dm")})
+      LEFT JOIN labels c ON c.name = ANY (directories.labels) AND c.sensitive
+      WHERE dm.repository_id = directories.repository_id
+        AND (#{@embargo}(directories.repository_id) IS NULL OR #{@embargo}(directories.repository_id) > #{@now})
+        AND (#{fails("directories", "dm")})
     )
     """
   end
 
-  defp fails(marking, listed) do
-    Enum.map_join(@controls, " OR ", &"(#{effective(&1, marking)} AND #{test(&1, marking, listed)})")
+  defp fails(visibility, invited) do
+    Enum.map_join(@restrictions, " OR ", &"(#{effective(&1, visibility)} AND #{test(&1, visibility, invited)})")
   end
 
-  defp test("federal_only", _marking, _listed), do: "u.employment <> 'federal'"
-  defp test("no_foreign", _marking, _listed), do: "u.nationality <> g.nationality"
-  defp test("releasable_to", marking, _listed), do: "NOT (u.nationality = ANY (#{marking}.releasable_to))"
-  defp test("named_list", _marking, listed), do: "NOT (#{@subject} = ANY (#{listed}.list))"
+  defp test("employees_only", _visibility, _invited), do: "u.employment <> 'employee'"
+  defp test("export_controlled", _visibility, _invited), do: "u.country <> g.country"
+  defp test("releasable_to", visibility, _invited), do: "NOT (u.country = ANY (#{visibility}.releasable_to))"
+  defp test("invite_only", _visibility, invited), do: "NOT (#{@subject} = ANY (#{invited}.invited))"
 
-  # A control is effective when the marking declares it or a specified
-  # category the marking names implies it. The policy copies nothing.
-  defp effective(control, marking) do
-    "('#{control}' = ANY (#{marking}.controls) OR '#{control}' = ANY (c.implied_controls))"
+  # A restriction is effective when the visibility declares it or a sensitive
+  # label the visibility names implies it. The policy copies nothing.
+  defp effective(restriction, visibility) do
+    "('#{restriction}' = ANY (#{visibility}.restrictions) OR '#{restriction}' = ANY (c.implied_restrictions))"
   end
 
   defp quoted(values), do: Enum.map_join(values, ", ", &"'#{&1}'")

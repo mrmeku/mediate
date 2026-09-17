@@ -6,28 +6,28 @@ defmodule ExampleFga.Infrastructure.Tuples do
   # translation:
   #
   # - An account's role on an object is a relation of that object.
-  # - A control that applies is the wildcard `user:*` on the relation named
-  #   for it. So what a marking states is one fact about the object and not
+  # - A restriction that applies is the wildcard `user:*` on the relation named
+  #   for it. So what a visibility states is one fact about the object and not
   #   a tuple per account.
-  # - A decontrol date is the condition `before_decontrol` with the date in
+  # - An embargo date is the condition `under_embargo` with the date in
   #   it. So a date that passes needs no drain.
 
   alias Mediate.Fga.Condition
   alias Mediate.Fga.TupleKey
 
-  @condition "before_decontrol"
+  @condition "under_embargo"
 
   @applies %{
-    federal_only: "fedonly_applies",
-    no_foreign: "noforn_applies",
-    releasable_to: "relto_applies",
-    named_list: "list_applies"
+    employees_only: "employee_applies",
+    export_controlled: "export_applies",
+    releasable_to: "regions_applies",
+    invite_only: "invite_applies"
   }
 
-  # A category implies FEDONLY or NOFORN and neither of the other two. REL TO
-  # rests on the countries a marking names, and DL ONLY on the accounts it
-  # lists. A category carries neither.
-  @implied %{federal_only: "fedonly_applies", no_foreign: "noforn_applies"}
+  # A label implies EMPLOYEE ONLY or EXPORT and neither of the other two. REGIONS
+  # rests on the countries a visibility names, and INVITE ONLY on the accounts
+  # it invites. A label carries neither.
+  @implied %{employees_only: "employee_applies", export_controlled: "export_applies"}
 
   @doc "An object of a type, as the model names it."
   @spec named(String.t(), [term()]) :: [String.t()]
@@ -39,12 +39,12 @@ defmodule ExampleFga.Infrastructure.Tuples do
     %TupleKey{user: user, relation: relation, object: object}
   end
 
-  @doc "The condition a decontrol date puts on a tuple, or none where there is no date."
+  @doc "The condition an embargo date puts on a tuple, or none where there is no date."
   @spec lapsing(DateTime.t() | nil) :: Condition.t() | nil
   def lapsing(nil), do: nil
 
   def lapsing(%DateTime{} = at) do
-    %Condition{name: @condition, context: %{"decontrol_at" => DateTime.to_iso8601(at)}}
+    %Condition{name: @condition, context: %{"lifts_at" => DateTime.to_iso8601(at)}}
   end
 
   @doc "One tuple per role an account holds on an object. An account with two roles holds both relations."
@@ -59,46 +59,46 @@ defmodule ExampleFga.Infrastructure.Tuples do
     for account <- accounts, do: key("user:#{account}", "member", object)
   end
 
-  @doc "The controls a specified category implies, as wildcards on the category."
+  @doc "The restrictions a sensitive label implies, as wildcards on the label."
   @spec implied([atom()], String.t()) :: [TupleKey.t()]
-  def implied(controls, object) when is_list(controls) and is_binary(object) do
-    for control <- Enum.uniq(controls), relation = @implied[control], do: key("user:*", relation, object)
+  def implied(restrictions, object) when is_list(restrictions) and is_binary(object) do
+    for restriction <- Enum.uniq(restrictions), relation = @implied[restriction], do: key("user:*", relation, object)
   end
 
-  @doc "The accounts a DL ONLY list names, which is a column of the banner rather than a row per account."
-  @spec listed([term()], String.t()) :: [TupleKey.t()]
-  def listed(list, object) when is_list(list) and is_binary(object) do
-    for account <- Enum.uniq(list), do: key("user:#{account}", "listed", object)
+  @doc "The accounts an INVITE ONLY visibility invites, which is a column of it rather than a row per account."
+  @spec invited([term()], String.t()) :: [TupleKey.t()]
+  def invited(accounts, object) when is_list(accounts) and is_binary(object) do
+    for account <- Enum.uniq(accounts), do: key("user:#{account}", "invited", object)
   end
 
   @doc """
-  The three things a marking states, read from the row that carries it:
+  The three things a visibility states, read from the row that carries it:
 
-  - the categories it names
-  - the countries REL TO releases to
-  - the controls that apply
+  - the labels it names
+  - the countries REGIONS releases to
+  - the restrictions that apply
 
-  The categories and the controls lapse with the date.
+  The labels and the restrictions lapse with the date.
   """
-  @spec marking(map() | nil, String.t(), Condition.t() | nil) :: [TupleKey.t()]
-  def marking(nil, _object, _lapses), do: []
+  @spec visibility(map() | nil, String.t(), Condition.t() | nil) :: [TupleKey.t()]
+  def visibility(nil, _object, _lapses), do: []
 
-  def marking(marking, object, lapses) when is_binary(object) do
-    categories(marking, object, lapses) ++ releases(marking, object) ++ flags(marking, object, lapses)
+  def visibility(visibility, object, lapses) when is_binary(object) do
+    labels(visibility, object, lapses) ++ releases(visibility, object) ++ flags(visibility, object, lapses)
   end
 
-  defp categories(marking, object, lapses) do
-    for category <- Enum.uniq(marking.categories) do
-      %TupleKey{user: "category:#{category}", relation: "category", object: object, condition: lapses}
+  defp labels(visibility, object, lapses) do
+    for label <- Enum.uniq(visibility.labels) do
+      %TupleKey{user: "label:#{label}", relation: "label", object: object, condition: lapses}
     end
   end
 
-  defp releases(marking, object) do
-    for country <- Enum.uniq(marking.releasable_to), do: key("country:#{country}", "releasable_to", object)
+  defp releases(visibility, object) do
+    for country <- Enum.uniq(visibility.releasable_to), do: key("country:#{country}", "releasable_to", object)
   end
 
-  defp flags(marking, object, lapses) do
-    for control <- Enum.uniq(marking.controls), relation = @applies[control] do
+  defp flags(visibility, object, lapses) do
+    for restriction <- Enum.uniq(visibility.restrictions), relation = @applies[restriction] do
       %TupleKey{user: "user:*", relation: relation, object: object, condition: lapses}
     end
   end

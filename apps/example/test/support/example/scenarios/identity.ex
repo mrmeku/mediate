@@ -8,98 +8,105 @@ defmodule Example.Scenarios.Identity do
   import Example.Scenarios.Support
   import ExUnit.Assertions
 
-  alias Example.Application.Documents
-  alias Example.Domain.Document
-  alias Example.Domain.Marking
+  alias Example.Application.Repositories
+  alias Example.Domain.Repository
+  alias Example.Domain.Visibility
   alias Example.Fixture
   alias Mediate.Id
 
-  @noforn %{controls: [:no_foreign]}
+  @export %{restrictions: [:export_controlled]}
 
   @spec ia_01() :: term()
   def ia_01 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
 
-    assert {:ok, %Marking{controls: [:no_foreign]}} =
-             Documents.change_marking(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, %Visibility{restrictions: [:export_controlled]}} =
+             Repositories.change_visibility(subject("dana"), repository.id, @export, fresh())
   end
 
   @spec ia_02() :: term()
   def ia_02 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_refused(Documents.change_marking(subject("dana"), document.id, @noforn, stale()), :change_marking)
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id, stale())
+    assert_refused(Repositories.change_visibility(subject("dana"), repository.id, @export, stale()), :change_visibility)
 
-    assert {:ok, %Marking{controls: [:no_foreign]}} =
-             Documents.change_marking(subject("dana"), document.id, @noforn, fresh())
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} =
+             Repositories.read(subject("dana"), repository.id, stale())
+
+    assert {:ok, %Visibility{restrictions: [:export_controlled]}} =
+             Repositories.change_visibility(subject("dana"), repository.id, @export, fresh())
   end
 
   @spec ia_03() :: term()
   def ia_03 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_refused(Documents.change_marking(subject("dana"), document.id, @noforn), :change_marking)
-    assert_refused(Documents.change_marking(subject("dana"), document.id, @noforn, env: %{}), :change_marking)
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
+    assert_refused(Repositories.change_visibility(subject("dana"), repository.id, @export), :change_visibility)
+    assert_refused(Repositories.change_visibility(subject("dana"), repository.id, @export, env: %{}), :change_visibility)
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("dana"), repository.id)
   end
 
   @spec ovr_01() :: term()
   def ovr_01 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:named_list], list: ["frank"])
+    repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["frank"])
     gil = subject("gil")
 
     settle()
-    assert_denied(gil, document)
+    assert_denied(gil, repository)
     operation_id = Id.new()
-    _ref = :telemetry_test.attach_event_handlers(self(), [Documents.override_event()])
-    assert {:ok, %Document{id: id}} = Documents.override_read(gil, document.id, "incident 12", operation_id: operation_id)
-    assert id == document.id
-    event = Documents.override_event()
+    _ref = :telemetry_test.attach_event_handlers(self(), [Repositories.override_event()])
+
+    assert {:ok, %Repository{id: id}} =
+             Repositories.override_read(gil, repository.id, "incident 12", operation_id: operation_id)
+
+    assert id == repository.id
+    event = Repositories.override_event()
     assert_received {^event, _ref, %{}, %{subject: %{id: "gil", type: "privileged"}, report: report}}
     assert report.operation_id == operation_id
     assert report.justification == "incident 12"
 
-    assert [%{user_id: "gil", document_id: ^id, justification: "incident 12"}] =
-             Documents.override_reports(world.office.id)
+    assert [%{user_id: "gil", repository_id: ^id, justification: "incident 12"}] =
+             Repositories.override_reports(world.team.id)
 
-    assert Documents.override_reports(world.foreign_office.id) == []
+    assert Repositories.override_reports(world.other_team.id) == []
   end
 
   @spec ovr_02() :: term()
   def ovr_02 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:named_list], list: ["frank"])
+    repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["frank"])
     gil = subject("gil")
 
     settle()
-    assert {:error, %Documents.OverrideRefused{reason: :no_justification}} = Documents.override_read(gil, document.id, "")
 
-    assert {:error, %Documents.OverrideRefused{reason: :no_justification}} =
-             Documents.override_read(gil, document.id, nil)
+    assert {:error, %Repositories.OverrideRefused{reason: :no_justification}} =
+             Repositories.override_read(gil, repository.id, "")
 
-    assert Documents.override_reports(world.office.id) == []
+    assert {:error, %Repositories.OverrideRefused{reason: :no_justification}} =
+             Repositories.override_read(gil, repository.id, nil)
+
+    assert Repositories.override_reports(world.team.id) == []
   end
 
   @spec ovr_03() :: term()
   def ovr_03 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
     gil = subject("gil")
 
     settle()
-    assert {:ok, %Document{}} = Documents.override_read(gil, document.id, "incident 12")
-    assert_refused(Documents.change_marking(gil, document.id, @noforn, fresh()), :change_marking)
-    assert_refused(Documents.decontrol(gil, document.id, fresh()), :decontrol)
-    refute Mediate.check(gil, :change_marking, Documents.object(document.id), fresh())
-    assert {:ok, %Document{marking: %{controls: []}}} = Documents.read(subject("dana"), document.id)
+    assert {:ok, %Repository{}} = Repositories.override_read(gil, repository.id, "incident 12")
+    assert_refused(Repositories.change_visibility(gil, repository.id, @export, fresh()), :change_visibility)
+    assert_refused(Repositories.lift_embargo(gil, repository.id, fresh()), :lift_embargo)
+    refute Mediate.check(gil, :change_visibility, Repositories.object(repository.id), fresh())
+    assert {:ok, %Repository{visibility: %{restrictions: []}}} = Repositories.read(subject("dana"), repository.id)
   end
 end

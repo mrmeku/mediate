@@ -3,14 +3,14 @@ defmodule ExampleFga.Population do
   The world the templates hold `ExampleFga.Infrastructure.TupleMapping` to:
 
   - the fixture's two tenants and ten accounts
-  - a document with a decontrol date, a banner, a list of accounts, and two
-    portions of its own
-  - a second document with none of those
-  - a marking proposal on the first document
+  - a repository with an embargo date, a visibility, an invited account, and
+    two directories of its own
+  - a second repository with none of those
+  - a visibility proposal on the first repository
 
-  `write/1` closes the foreign program at the end. A purpose that has ended
+  `write/1` archives the Globex project at the end. An archived project
   requires no tuple, and a population is worth as much with one as with a
-  purpose that still runs.
+  project that still runs.
   """
 
   @behaviour Mediate.Fga.Population
@@ -18,17 +18,17 @@ defmodule ExampleFga.Population do
   use Boundary, top_level?: true, deps: [Ecto, Example, Example.Fixture, Mediate.Fga]
 
   alias Example.Domain.AccountRole
-  alias Example.Domain.Agency
-  alias Example.Domain.Assignment
-  alias Example.Domain.Category
-  alias Example.Domain.Document
-  alias Example.Domain.Marking
-  alias Example.Domain.Office
-  alias Example.Domain.OfficeRole
-  alias Example.Domain.Portion
-  alias Example.Domain.Program
+  alias Example.Domain.Directory
+  alias Example.Domain.Enterprise
+  alias Example.Domain.Label
+  alias Example.Domain.Membership
+  alias Example.Domain.Project
   alias Example.Domain.Proposal
+  alias Example.Domain.Repository
+  alias Example.Domain.Team
+  alias Example.Domain.TeamRole
   alias Example.Domain.User
+  alias Example.Domain.Visibility
   alias Example.Fixture
   alias Mediate.Fga.Population
 
@@ -38,45 +38,45 @@ defmodule ExampleFga.Population do
   # leave in.
   @tables [
     Proposal,
-    Portion,
-    Marking,
-    Document,
-    OfficeRole,
-    Assignment,
+    Directory,
+    Visibility,
+    Repository,
+    TeamRole,
+    Membership,
     AccountRole,
     User,
-    Program,
-    Office,
-    Agency,
-    Category
+    Project,
+    Team,
+    Enterprise,
+    Label
   ]
 
   # An object of each type that no row names. The two attribute types are
   # values rather than rows: a country nobody holds and an employment
   # outside the column's set.
-  @absent %{"category" => "NOSUCH", "country" => "ZZ", "employment" => "none"}
+  @absent %{"label" => "NOSUCH", "country" => "ZZ", "employment" => "none"}
 
   @impl Population
   def write(repo) do
     world = Fixture.world!()
 
-    document =
-      Fixture.document!(world,
-        title: "controlled",
-        decontrol: DateTime.shift(DateTime.utc_now(:second), day: 365),
-        categories: ["PRVCY"],
-        controls: [:releasable_to, :named_list],
+    repository =
+      Fixture.repository!(world,
+        name: "restricted",
+        embargo: DateTime.shift(DateTime.utc_now(:second), day: 365),
+        labels: ["secrets"],
+        restrictions: [:releasable_to, :invite_only],
         releasable_to: ["US", "FR"],
-        list: ["frank"],
-        portions: [
-          %{body: "first", categories: ["CTI"], controls: [:no_foreign]},
-          %{body: "second"}
+        invited: ["frank"],
+        directories: [
+          %{name: "first", contents: "first", labels: ["crypto"], restrictions: [:export_controlled]},
+          %{name: "second", contents: "second"}
         ]
       )
 
-    _plain = Fixture.document!(world, title: "plain", program: world.foreign_program, office: world.foreign_office)
-    _proposal = insert(repo, %Proposal{document_id: document.id, proposer_id: "dana", categories: ["PROPIN"]})
-    _closed = Fixture.close_program!(world.foreign_program)
+    _plain = Fixture.repository!(world, name: "plain", project: world.other_project, team: world.other_team)
+    _proposal = insert(repo, %Proposal{repository_id: repository.id, proposer_id: "dana", labels: ["docs"]})
+    _archived = Fixture.archive_project!(world.other_project)
 
     :ok
   end
@@ -90,9 +90,9 @@ defmodule ExampleFga.Population do
 
   @impl Population
   def disturb(repo) do
-    assignment = repo.get_by!(Assignment, [user_id: "ann"], mediate: @exemption)
+    membership = repo.get_by!(Membership, [user_id: "ann"], mediate: @exemption)
 
-    delete(repo, assignment)
+    delete(repo, membership)
   end
 
   @impl Population

@@ -50,7 +50,7 @@ defmodule Example.MixProject do
 
   # Example.Scenarios and the scenario bodies are test support. They run in
   # the suites of the thin applications, under a real adapter. This
-  # application's own run holds the table to the document and covers the
+  # application's own run holds the table to the repository and covers the
   # contexts against the fake adapter.
   defp ignore_modules do
     [~r/^Example\.Scenarios/, ~r/^Example\.Fixture/, ~r/^Example\.Cluster/]
@@ -85,7 +85,7 @@ defmodule Example.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md": [title: "The example: controlled unclassified information"]]
+      extras: ["README.md": [title: "The example: code hosting"]]
     ]
   end
 

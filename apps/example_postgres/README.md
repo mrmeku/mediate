@@ -6,16 +6,16 @@ This application binds the example of `example` to `Mediate.Postgres`. It boots 
 
 | Rule | Mechanism | Test group |
 |---|---|---|
-| C1 | `mediate_scope_read` on `documents`, an `EXISTS` over `assignments` and one over `office_roles` | enforcement |
-| C2 | the blocked subquery in the same policy, which reads `employment` and `nationality` from `users` at every statement | enforcement |
-| C3 | the `LEFT JOIN` to `categories` on `specified`, whose `implied_controls` widen the declared ones | enforcement |
-| C4 | the banner `Example.Application.Documents` keeps at write time, beside `mediate_scope_read` on `portions`, which reaches the document through the accessor functions | enforcement, least privilege |
-| C5 | `mediate.now`, set by the adapter for the length of the call, compared with `decontrol` | enforcement |
-| C6 | membership of the marking's `list` column, which no other clause reaches | enforcement |
-| C7 | `mediate_gate_change_marking`, `mediate_gate_set_decontrol`, and `mediate_gate_decontrol`, `WITH CHECK` policies with no operation guard | least privilege, emergency override |
+| C1 | `mediate_scope_read` on `repositories`, an `EXISTS` over `memberships` and one over `team_roles` | enforcement |
+| C2 | the blocked subquery in the same policy, which reads `employment` and `country` from `users` at every statement | enforcement |
+| C3 | the `LEFT JOIN` to `labels` on `sensitive`, whose `implied_restrictions` widen the declared ones | enforcement |
+| C4 | the rollup `Example.Application.Repositories` keeps at write time, beside `mediate_scope_read` on `directories`, which reaches the repository through the accessor functions | enforcement, least privilege |
+| C5 | `mediate.now`, set by the adapter for the length of the call, compared with `embargo` | enforcement |
+| C6 | membership of the visibility's `invited` column, which no other clause reaches | enforcement |
+| C7 | `mediate_gate_change_visibility`, `mediate_gate_set_embargo`, and `mediate_gate_lift_embargo`, `WITH CHECK` policies with no operation guard | least privilege, emergency override |
 | C8 | `mediate.reauthenticated_at` inside those gates, within the window | re-authentication |
-| C9 | `mediate_scope_approve_marking` and its gate on `marking_proposals` | separation of duties |
-| C10 | a declared exemption in `Example.Application.Documents`, which the exemption policy of the application role admits, with permission, justification, event, and report in the example's code | least privilege, emergency override |
+| C9 | `mediate_scope_approve_visibility` and its gate on `visibility_proposals` | separation of duties |
+| C10 | a declared exemption in `Example.Application.Repositories`, which the exemption policy of the application role admits, with permission, justification, event, and report in the example's code | least privilege, emergency override |
 | C11 | policies evaluate when a statement runs | revocation and expiry |
 | C12 | printed by the adapter's suite, never asserted | revocation and expiry |
 | C13 | the read policy narrows the query the repo runs, so `scope` answers `true` | enforcement |

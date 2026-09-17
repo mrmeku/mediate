@@ -1,0 +1,102 @@
+# The rules in docs/example.md over a repository, as one resource
+# policy. The allow rule is the access path (C1). The four deny rules are
+# the restrictions (C2), each over the restrictions effective on the
+# repository's rollup, which the attribute declaration derives (C3), and
+# each under the embargo date the request's own moment is compared with
+# (C5). The visibility actions are the owning team's (C7) under the
+# reauthentication window (C8).
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: repository
+  rules:
+    - actions: ["read", "checkout"]
+      effect: EFFECT_ALLOW
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          any:
+            of:
+              - expr: '"maintainer" in request.resource.attr.project_roles'
+              - expr: '"contributor" in request.resource.attr.project_roles'
+              - expr: '"admin" in request.resource.attr.team_roles'
+              - expr: '"reviewer" in request.resource.attr.team_roles'
+
+    - actions: ["read"]
+      effect: EFFECT_DENY
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: '"employees_only" in request.resource.attr.effective_restrictions'
+              - expr: 'request.principal.attr.employment != "employee"'
+              - any:
+                  of:
+                    - expr: request.resource.attr.embargo == null
+                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+
+    - actions: ["read"]
+      effect: EFFECT_DENY
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: '"export_controlled" in request.resource.attr.effective_restrictions'
+              - expr: '!(request.principal.attr.country in request.resource.attr.enterprise_countries)'
+              - any:
+                  of:
+                    - expr: request.resource.attr.embargo == null
+                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+
+    - actions: ["read"]
+      effect: EFFECT_DENY
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: '"releasable_to" in request.resource.attr.effective_restrictions'
+              - expr: '!(request.principal.attr.country in request.resource.attr.releasable_to)'
+              - any:
+                  of:
+                    - expr: request.resource.attr.embargo == null
+                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+
+    - actions: ["read"]
+      effect: EFFECT_DENY
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: '"invite_only" in request.resource.attr.effective_restrictions'
+              - expr: '!(request.principal.id in request.resource.attr.invited)'
+              - any:
+                  of:
+                    - expr: request.resource.attr.embargo == null
+                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+
+    - actions: ["change_visibility", "set_embargo", "lift_embargo"]
+      effect: EFFECT_ALLOW
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: '"admin" in request.resource.attr.team_roles'
+              - expr: request.principal.attr.environment.reauthenticated_at != null
+              - expr: >-
+                  timestamp(request.principal.attr.environment.reauthenticated_at)
+                  <= timestamp(request.principal.attr.environment.now)
+              - expr: >-
+                  timestamp(request.principal.attr.environment.reauthenticated_at)
+                  >= timestamp(request.principal.attr.environment.now) - duration("900s")
+
+    - actions: ["propose_visibility"]
+      effect: EFFECT_ALLOW
+      roles: ["user", "non_person_entity", "privileged"]
+      condition:
+        match:
+          expr: '"admin" in request.resource.attr.team_roles'

@@ -14,25 +14,25 @@ defmodule Example.Scenarios.Review do
   @spec rvw_01() :: term()
   def rvw_01 do
     world = Fixture.world!()
-    open = Fixture.document!(world)
-    federal = Fixture.document!(world, controls: [:federal_only])
-    foreign = Fixture.document!(world, program: world.foreign_program, office: world.foreign_office)
+    open = Fixture.repository!(world)
+    employees = Fixture.repository!(world, restrictions: [:employees_only])
+    globex = Fixture.repository!(world, project: world.other_project, team: world.other_team)
 
     settle()
     report = Review.report(subject("eve"), fresh())
-    [_head, domestic, foreign_section] = String.split(report, ~r/^agency /m)
-    assert_section(domestic, "Domestic", ann: [open, federal], bob: [open], frank: [], ivan: [])
-    assert_section(foreign_section, "Foreign", ivan: [foreign], ann: [])
-    readers = Review.readers(subject("eve"), world.agency, fresh())
-    assert readers[subject("ann")] == [open.id, federal.id]
+    [_head, acme, other_section] = String.split(report, ~r/^enterprise /m)
+    assert_section(acme, "Acme", ann: [open, employees], bob: [open], frank: [], ivan: [])
+    assert_section(other_section, "Globex", ivan: [globex], ann: [])
+    readers = Review.readers(subject("eve"), world.enterprise, fresh())
+    assert readers[subject("ann")] == [open.id, employees.id]
     assert readers[subject("bob")] == [open.id]
   end
 
-  defp assert_section(section, agency, reads) do
-    assert section =~ agency
+  defp assert_section(section, enterprise, reads) do
+    assert section =~ enterprise
 
-    for {account, documents} <- reads do
-      assert section =~ "#{account} reads [#{Enum.map_join(documents, ", ", & &1.id)}]"
+    for {account, repositories} <- reads do
+      assert section =~ "#{account} reads [#{Enum.map_join(repositories, ", ", & &1.id)}]"
     end
   end
 end

@@ -6,14 +6,14 @@ defmodule Mediate.Postgres.SettingsTest do
   @at ~U[2026-09-08 12:00:00Z]
 
   test "four settings are always set, and every supplied fact is set under its own name" do
-    settings = Settings.of(subject(), :read, environment(%{nationality: "us", reauthenticated_at: @at}))
+    settings = Settings.of(subject(), :read, environment(%{country: "us", reauthenticated_at: @at}))
 
     assert settings.pairs == [
              {"mediate.subject_id", "acct-a"},
              {"mediate.subject_kind", "user"},
              {"mediate.operation", "read"},
              {"mediate.now", "2026-09-08T12:00:00Z"},
-             {"mediate.nationality", "us"},
+             {"mediate.country", "us"},
              {"mediate.reauthenticated_at", "2026-09-08T12:00:00Z"}
            ]
   end
@@ -67,10 +67,10 @@ defmodule Mediate.Postgres.SettingsTest do
 
   test "what a call puts back holds the outer call's values and empties the names only it set" do
     outer = Settings.of(subject(), :read, environment(%{}))
-    inner = Settings.of({:user, "acct-b"}, :edit, environment(%{nationality: "fr"}))
+    inner = Settings.of({:user, "acct-b"}, :edit, environment(%{country: "fr"}))
 
     assert Settings.restored(inner, outer).pairs == [
-             {"mediate.nationality", ""},
+             {"mediate.country", ""},
              {"mediate.subject_id", "acct-a"},
              {"mediate.subject_kind", "user"},
              {"mediate.operation", "read"},

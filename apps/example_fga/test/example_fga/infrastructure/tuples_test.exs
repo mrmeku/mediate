@@ -3,7 +3,7 @@ defmodule ExampleFga.Infrastructure.TuplesTest do
 
   alias ExampleFga.Infrastructure.Tuples
 
-  test "a document with no marking states nothing about categories, releases, or controls" do
-    assert Tuples.marking(nil, "document:1", nil) == []
+  test "a repository with no visibility states nothing about labels, releases, or restrictions" do
+    assert Tuples.visibility(nil, "repository:1", nil) == []
   end
 end

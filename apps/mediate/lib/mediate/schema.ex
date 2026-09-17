@@ -45,16 +45,16 @@ defmodule Mediate.Schema do
   Each macro records its declaration and does nothing else. The seam reads
   them back through `__mediate__/1`.
 
-      defmodule Example.Domain.Marking do
+      defmodule Example.Domain.Visibility do
         use Ecto.Schema
         use Mediate.Schema
 
-        object_type(:marking)
+        object_type(:visibility)
         audited(:entity)
-        fact(:categories, kind: :object_attribute, object: :document_id, element: :category)
-        fact(:controls, kind: :object_attribute, object: :document_id, element: :control)
-        fact(:releasable_to, kind: :object_attribute, object: :document_id, element: :country)
-        fact(:list, kind: :relationship, object: :document_id, element: :user)
+        fact(:labels, kind: :object_attribute, object: :repository_id, element: :label)
+        fact(:restrictions, kind: :object_attribute, object: :repository_id, element: :restriction)
+        fact(:releasable_to, kind: :object_attribute, object: :repository_id, element: :country)
+        fact(:invited, kind: :relationship, object: :repository_id, element: :user)
       end
 
   A schema that declares an object type is protected: the seam refuses to

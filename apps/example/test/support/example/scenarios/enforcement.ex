@@ -15,232 +15,242 @@ defmodule Example.Scenarios.Enforcement do
   import Example.Scenarios.Support
   import ExUnit.Assertions
 
-  alias Example.Application.Documents
-  alias Example.Domain.Document
+  alias Example.Application.Repositories
+  alias Example.Domain.Repository
   alias Example.Fixture
   alias Mediate.Test.Clock
 
   @spec enf_01() :: term()
   def enf_01 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_read(subject("ann"), document)
+    assert_read(subject("ann"), repository)
   end
 
   @spec enf_02() :: term()
   def enf_02 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_denied(subject("frank"), document)
+    assert_denied(subject("frank"), repository)
   end
 
   @spec enf_03() :: term()
   def enf_03 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    assert_read(subject("dana"), document)
+    assert_read(subject("dana"), repository)
   end
 
   @spec enf_04() :: term()
   def enf_04 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:federal_only])
+    repository = Fixture.repository!(world, restrictions: [:employees_only])
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_denied(subject("bob"), document)
+    assert_read(subject("ann"), repository)
+    assert_denied(subject("bob"), repository)
   end
 
   @spec enf_05() :: term()
   def enf_05 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:no_foreign])
+    repository = Fixture.repository!(world, restrictions: [:export_controlled])
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_denied(subject("carl"), document)
+    assert_read(subject("ann"), repository)
+    assert_denied(subject("carl"), repository)
   end
 
   @spec enf_06() :: term()
   def enf_06 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:releasable_to], releasable_to: ["FR", "GB"])
+    repository = Fixture.repository!(world, restrictions: [:releasable_to], releasable_to: ["FR", "GB"])
 
     settle()
-    assert_read(subject("carl"), document)
-    assert_denied(subject("ann"), document)
+    assert_read(subject("carl"), repository)
+    assert_denied(subject("ann"), repository)
   end
 
   @spec enf_07() :: term()
   def enf_07 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:named_list], list: ["ann"])
+    repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["ann"])
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_denied(subject("bob"), document)
+    assert_read(subject("ann"), repository)
+    assert_denied(subject("bob"), repository)
   end
 
   @spec enf_08() :: term()
   def enf_08 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:federal_only, :no_foreign])
+    repository = Fixture.repository!(world, restrictions: [:employees_only, :export_controlled])
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_denied(subject("carl"), document)
-    assert_denied(subject("bob"), document)
+    assert_read(subject("ann"), repository)
+    assert_denied(subject("carl"), repository)
+    assert_denied(subject("bob"), repository)
   end
 
   @spec enf_09() :: term()
   def enf_09 do
     world = Fixture.world!()
-    document = Fixture.document!(world, categories: ["PRVCY"])
-    assert document.marking.controls == []
+    repository = Fixture.repository!(world, labels: ["secrets"])
+    assert repository.visibility.restrictions == []
 
     settle()
-    assert_read(subject("ann"), document)
-    assert_denied(subject("bob"), document)
-    unspecified = Fixture.document!(world, categories: ["PROPIN"])
+    assert_read(subject("ann"), repository)
+    assert_denied(subject("bob"), repository)
+    not_sensitive = Fixture.repository!(world, labels: ["docs"])
 
     settle()
-    assert_read(subject("bob"), unspecified)
+    assert_read(subject("bob"), not_sensitive)
   end
 
   @spec enf_10() :: term()
   def enf_10 do
     world = Fixture.world!()
-    document = Fixture.document!(world)
+    repository = Fixture.repository!(world)
 
     settle()
-    for id <- ["ann", "bob", "carl"], do: assert_read(subject(id), document)
+    for id <- ["ann", "bob", "carl"], do: assert_read(subject(id), repository)
   end
 
   @spec enf_11() :: term()
   def enf_11 do
     world = Fixture.world!()
 
-    document =
-      Fixture.document!(world, portions: [%{body: "open"}, %{body: "domestic", controls: [:no_foreign]}])
+    repository =
+      Fixture.repository!(world,
+        directories: [
+          %{name: "open", contents: "open"},
+          %{name: "export", contents: "export", restrictions: [:export_controlled]}
+        ]
+      )
 
-    [open, domestic] = document.portions
+    [open, export] = repository.directories
 
     settle()
-    assert_denied(subject("carl"), document)
-    assert {:ok, %Document{portions: portions}} = Documents.read_redacted(subject("carl"), document.id)
-    assert Enum.map(portions, & &1.id) == [open.id]
-    assert {:ok, %Document{portions: portions}} = Documents.read_redacted(subject("ann"), document.id)
-    assert Enum.map(portions, & &1.id) == [open.id, domestic.id]
-    assert_refused(Documents.read_redacted(subject("frank"), document.id), :read_redacted)
+    assert_denied(subject("carl"), repository)
+    assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("carl"), repository.id)
+    assert Enum.map(directories, & &1.id) == [open.id]
+    assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("ann"), repository.id)
+    assert Enum.map(directories, & &1.id) == [open.id, export.id]
+    assert_refused(Repositories.checkout(subject("frank"), repository.id), :checkout)
   end
 
   @spec enf_12() :: term()
   def enf_12 do
     world = Fixture.world!()
-    document = Fixture.document!(world, portions: [%{body: "domestic", controls: [:no_foreign]}])
-    dropped = %{controls: []}
+
+    repository =
+      Fixture.repository!(world, directories: [%{name: "export", contents: "export", restrictions: [:export_controlled]}])
+
+    dropped = %{restrictions: []}
 
     settle()
 
-    assert {:error, %Documents.BannerViolation{portions: %{controls: [:no_foreign]}}} =
-             Documents.change_marking(subject("dana"), document.id, dropped, fresh())
+    assert {:error, %Repositories.RollupViolation{directories: %{restrictions: [:export_controlled]}}} =
+             Repositories.change_visibility(subject("dana"), repository.id, dropped, fresh())
 
-    assert {:ok, %Document{marking: %{controls: [:no_foreign]}}} = Documents.read(subject("dana"), document.id)
-    wider = %{controls: [:no_foreign, :federal_only]}
+    assert {:ok, %Repository{visibility: %{restrictions: [:export_controlled]}}} =
+             Repositories.read(subject("dana"), repository.id)
 
-    assert {:ok, %Example.Domain.Marking{controls: controls}} =
-             Documents.change_marking(subject("dana"), document.id, wider, fresh())
+    wider = %{restrictions: [:export_controlled, :employees_only]}
 
-    assert Enum.sort(controls) == [:federal_only, :no_foreign]
+    assert {:ok, %Example.Domain.Visibility{restrictions: restrictions}} =
+             Repositories.change_visibility(subject("dana"), repository.id, wider, fresh())
+
+    assert Enum.sort(restrictions) == [:employees_only, :export_controlled]
   end
 
   @spec enf_13() :: term()
   def enf_13 do
     world = Fixture.world!()
     past = DateTime.shift(DateTime.utc_now(), hour: -1)
-    document = Fixture.document!(world, controls: [:federal_only], decontrol: past)
+    repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: past)
 
     settle()
-    assert_read(subject("bob"), document)
+    assert_read(subject("bob"), repository)
   end
 
   @spec enf_14() :: term()
   def enf_14 do
     world = Fixture.world!()
-    decontrol = DateTime.utc_now(:second)
-    document = Fixture.document!(world, controls: [:federal_only], decontrol: decontrol)
-    _at = Clock.set(DateTime.shift(decontrol, second: -1))
+    embargo = DateTime.utc_now(:second)
+    repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: embargo)
+    _at = Clock.set(DateTime.shift(embargo, second: -1))
 
     settle()
-    assert_denied(subject("bob"), document)
-    _at = Clock.set(DateTime.shift(decontrol, second: 1))
-    assert_read(subject("bob"), document)
+    assert_denied(subject("bob"), repository)
+    _at = Clock.set(DateTime.shift(embargo, second: 1))
+    assert_read(subject("bob"), repository)
   end
 
   @spec enf_15() :: term()
   def enf_15 do
     world = Fixture.world!()
     past = DateTime.shift(DateTime.utc_now(), hour: -1)
-    document = Fixture.document!(world, controls: [:federal_only], decontrol: past)
+    repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: past)
 
     settle()
-    assert_denied(subject("frank"), document)
+    assert_denied(subject("frank"), repository)
   end
 
   @spec enf_16() :: term()
   def enf_16 do
     world = Fixture.world!()
-    document = Fixture.document!(world, controls: [:named_list], list: ["frank"])
+    repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["frank"])
 
     settle()
-    assert_denied(subject("frank"), document)
+    assert_denied(subject("frank"), repository)
   end
 
   @spec enf_17() :: term()
   def enf_17 do
     world = Fixture.world!()
-    domestic = Fixture.document!(world)
-    foreign = Fixture.document!(world, program: world.foreign_program, office: world.foreign_office)
+    acme = Fixture.repository!(world)
+    globex = Fixture.repository!(world, project: world.other_project, team: world.other_team)
 
     settle()
-    assert listed(subject("ann")) == [domestic.id]
-    refute reads?(subject("ann"), foreign)
-    assert listed(subject("ivan")) == [foreign.id]
-    assert_read(subject("ivan"), foreign)
+    assert invited(subject("ann")) == [acme.id]
+    refute reads?(subject("ann"), globex)
+    assert invited(subject("ivan")) == [globex.id]
+    assert_read(subject("ivan"), globex)
   end
 
   @spec enf_18() :: term()
   def enf_18 do
     world = Fixture.world!()
 
-    document =
-      Fixture.document!(world,
-        portions: [
-          %{body: "allied", controls: [:releasable_to], releasable_to: ["FR", "US"]},
-          %{body: "domestic", controls: [:releasable_to], releasable_to: ["US"]}
+    repository =
+      Fixture.repository!(world,
+        directories: [
+          %{name: "worldwide", contents: "worldwide", restrictions: [:releasable_to], releasable_to: ["FR", "US"]},
+          %{name: "us_only", contents: "us_only", restrictions: [:releasable_to], releasable_to: ["US"]}
         ]
       )
 
-    [allied, domestic] = document.portions
+    [worldwide, us_only] = repository.directories
 
     settle()
-    assert_denied(subject("carl"), document)
-    assert {:ok, %Document{portions: portions}} = Documents.read_redacted(subject("carl"), document.id)
-    assert Enum.map(portions, & &1.id) == [allied.id]
-    assert_read(subject("ann"), document)
-    assert {:ok, %Document{portions: portions}} = Documents.read_redacted(subject("ann"), document.id)
-    assert Enum.map(portions, & &1.id) == [allied.id, domestic.id]
+    assert_denied(subject("carl"), repository)
+    assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("carl"), repository.id)
+    assert Enum.map(directories, & &1.id) == [worldwide.id]
+    assert_read(subject("ann"), repository)
+    assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("ann"), repository.id)
+    assert Enum.map(directories, & &1.id) == [worldwide.id, us_only.id]
   end
 
-  defp listed(subject) do
+  defp invited(subject) do
     subject
-    |> Documents.list()
+    |> Repositories.list()
     |> Enum.map(& &1.id)
   end
 end

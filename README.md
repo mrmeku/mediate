@@ -8,18 +8,18 @@ Mediate is the port-and-adapters API an Elixir application uses to express its a
 
 ```elixir
 # one object: the decision the seam accepts
-{:ok, decision} = Mediate.authorize(subject, :read, {:document, id})
-Repo.get(Document, id, mediate: decision)
+{:ok, decision} = Mediate.authorize(subject, :read, {:repository, id})
+Repo.get(Repository, id, mediate: decision)
 
 # a yes or no, for a branch that does not reach the repo
 Mediate.check(subject, :approve, {:proposal, id})
 
 # a whole type: a rule the query carries, which can only narrow
-{rule, decision} = Mediate.scope(subject, :read, :document)
-Repo.all(from(d in Document, where: ^rule), mediate: decision)
+{rule, decision} = Mediate.scope(subject, :read, :repository)
+Repo.all(from(d in Repository, where: ^rule), mediate: decision)
 
 # who can do what today, asked by a reviewer
-Mediate.review(reviewer, subjects, :read, :document)
+Mediate.review(reviewer, subjects, :read, :repository)
 ```
 
 A subject is `{kind, id}`, and an object is `{type, id}`. The `Mediate` moduledoc has the options and says when to use each call.

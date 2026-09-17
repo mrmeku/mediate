@@ -11,19 +11,19 @@ defmodule Example.Infrastructure.OcsfTest do
     operation: :update,
     kind: :role,
     target: {:role, 7},
-    changes: %{role: {:member, :designator}},
+    changes: %{role: {:contributor, :admin}},
     actor: {:privileged, "gil"},
     actor_kind: :privileged,
     time: @now,
     operation_id: "op-1",
-    schema: Example.Domain.Assignment
+    schema: Example.Domain.Membership
   }
 
   @decision %{
     subject: {:user, "ann"},
     subject_kind: :user,
     operation: :read,
-    object: {:document, 4},
+    object: {:repository, 4},
     verdict: :allow,
     reason: :allowed,
     decider: Mediate.Test.Fake,
@@ -35,8 +35,8 @@ defmodule Example.Infrastructure.OcsfTest do
   }
 
   @access %{
-    object_type: :document,
-    schema: Example.Domain.Document,
+    object_type: :repository,
+    schema: Example.Domain.Repository,
     repo: Example.Infrastructure.Repo,
     call: {:get, 3},
     activity: :read,
@@ -66,8 +66,8 @@ defmodule Example.Infrastructure.OcsfTest do
              correlation_uid: "op-1"
            }
 
-    assert record.unmapped.changes == %{role: %{before: :member, after: :designator}}
-    assert record.unmapped.schema == "Example.Domain.Assignment"
+    assert record.unmapped.changes == %{role: %{before: :contributor, after: :admin}}
+    assert record.unmapped.schema == "Example.Domain.Membership"
   end
 
   test "each kind has its class and each operation its activity" do
@@ -89,18 +89,18 @@ defmodule Example.Infrastructure.OcsfTest do
     assert {record.status_id, record.status, record.severity_id} == {1, "Success", 1}
     assert record.duration == 125
     assert record.actor == %{user: %{uid: "ann", type_id: 1, type: "User"}}
-    assert record.resource == %{type: "document", uid: "4"}
+    assert record.resource == %{type: "repository", uid: "4"}
     assert record.api == %{operation: "read", response: %{message: "allowed"}}
     assert record.unmapped.decider == "Mediate.Test.Fake"
     assert record.unmapped.policy_version == "fake"
   end
 
   test "a denial is a failure of low severity, an unnumbered operation is other, and a narrowing call is a query that succeeded" do
-    denied = Ocsf.decision(%{@decision | verdict: :deny, reason: :deny_by_default, operation: :change_marking}, 1)
+    denied = Ocsf.decision(%{@decision | verdict: :deny, reason: :deny_by_default, operation: :change_visibility}, 1)
 
     assert {denied.status_id, denied.status, denied.severity_id} == {2, "Failure", 2}
     assert {denied.activity_id, denied.activity_name} == {99, "Other"}
-    assert denied.api.operation == "change_marking"
+    assert denied.api.operation == "change_visibility"
     assert denied.api.response.message == "deny_by_default"
 
     narrowed = Ocsf.decision(%{@decision | verdict: :scoped, object: dynamic([row], row.id == 1)}, 1)
@@ -122,7 +122,7 @@ defmodule Example.Infrastructure.OcsfTest do
     assert record.time == @now
     assert record.actor == %{user: %{uid: "ann", type_id: 1, type: "User"}}
     assert record.database == %{name: "Example.Infrastructure.Repo"}
-    assert record.table == %{name: "document"}
+    assert record.table == %{name: "repository"}
     assert record.metadata.correlation_uid == "op-1"
     assert record.unmapped == %{ids: ["4"], count: 1, decision_id: "dec-1"}
 
@@ -132,9 +132,9 @@ defmodule Example.Infrastructure.OcsfTest do
   end
 
   test "an object asked about by its type alone carries no id" do
-    record = Ocsf.decision(%{@decision | object: {:document, nil}}, 1)
+    record = Ocsf.decision(%{@decision | object: {:repository, nil}}, 1)
 
-    assert record.resource == %{type: "document", uid: nil}
+    assert record.resource == %{type: "repository", uid: nil}
   end
 
   test "a subject of a kind the mapping does not know is an unknown user" do

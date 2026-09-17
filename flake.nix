@@ -99,7 +99,9 @@
           };
 
           devShells.default = pkgs.mkShell {
-            packages = tools ++ [ pkgs.git ];
+            # curl asks Hex what it already holds, which is how the
+            # release workflow skips a package it published before.
+            packages = tools ++ [ pkgs.git pkgs.curl ];
             # Hex and rebar live inside the checkout, so the shell owns its own state.
             shellHook = ''
               export LANG=C.UTF-8

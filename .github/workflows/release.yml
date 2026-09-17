@@ -2,7 +2,8 @@ name: release
 
 # The trigger. It runs on a `v*` tag and by hand, and it publishes nothing
 # until the tarballs pass the same scenarios `ci.yml` runs them through.
-# `HEX_API_KEY` is a repository secret, and it reaches the publish job alone.
+# `HEX_API_KEY` is a secret of the `hex` environment, and the publish job is
+# the only job that names that environment.
 
 on:
   push:
@@ -53,8 +54,14 @@ jobs:
               mix test --warnings-as-errors'
 
   # One job, in order: a package cannot publish before the package it
-  # requires is on Hex. `MEDIATE_UMBRELLA` is unset, so each `mix.exs`
-  # binds its siblings by requirement.
+  # requires is on Hex. `MEDIATE_UMBRELLA` is unset, so each `mix.exs` binds
+  # its siblings by requirement, and `mix hex.publish` compiles the package
+  # to build its documentation, so each package fetches those siblings from
+  # Hex before it builds.
+  #
+  # A package already at this version is skipped rather than published
+  # again, because Hex refuses a version it holds. So a run that stops
+  # partway through the seven is finished by running it again.
   publish:
     needs: [version, packages]
     runs-on: ubuntu-latest
@@ -64,11 +71,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: DeterminateSystems/nix-installer-action@v22
-      - run: nix develop --command mix deps.get
       - run: |
           nix develop --command bash -c '
             set -eu
             unset MEDIATE_UMBRELLA
+            version="${TAG#v}"
+
             for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_fga; do
-              (cd "apps/$app" && mix hex.publish --yes)
+              if curl -fsS -o /dev/null "https://hex.pm/api/packages/$app/releases/$version"; then
+                echo "$app $version is on Hex already"
+                continue
+              fi
+
+              (
+                cd "apps/$app"
+
+                # The sibling this package requires reached Hex seconds ago,
+                # and a fetch reads a registry behind a cache. So the fetch
+                # repeats until it sees the release.
+                for attempt in 1 2 3 4 5 6 7 8; do
+                  if mix deps.get; then break; fi
+                  echo "deps.get for $app failed on attempt $attempt"
+                  sleep 15
+                done
+
+                mix hex.publish --yes
+              )
             done'

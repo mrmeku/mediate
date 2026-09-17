@@ -56,6 +56,7 @@ defmodule ExamplePostgres.MixProject do
       {:ecto, "3.14.2"},
       {:ecto_sql, "3.14.0"},
       {:postgrex, "0.22.4"},
+      {:stream_data, "1.4.0", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},

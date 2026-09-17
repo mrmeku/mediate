@@ -1,17 +1,12 @@
 defmodule Mediate.FreezeTest do
   @moduledoc """
-  The frozen lists. A change here follows a change to `docs/conformance.md`
-  under "The laws" or "The guarantees", in the same commit.
+  The frozen lists of the port. The law and guarantee tables are frozen
+  against `docs/conformance.md` by the freeze test of `mediate_conformance`.
   """
 
   use ExUnit.Case, async: true
 
-  alias Mediate.Conformance.Law
-  alias Mediate.Conformance.RepoCase
-
   @moduletag :freeze
-
-  @conformance Path.expand("../../../../docs/conformance.md", __DIR__)
 
   test "Mediate.Adapter has the frozen callbacks" do
     assert Enum.sort(Mediate.Adapter.behaviour_info(:callbacks)) ==
@@ -50,45 +45,10 @@ defmodule Mediate.FreezeTest do
                 unsupported invalid unmediated)a
   end
 
-  test "the law table equals docs/conformance.md under The laws" do
-    assert Law.all() == Enum.map(rows("\n## The laws"), &law/1)
-  end
-
-  test "the guarantee table equals docs/conformance.md under The guarantees" do
-    assert RepoCase.guarantees() == Enum.map(rows("\n## The guarantees"), &guarantee/1)
-  end
-
   defp fields(module) do
     module.__struct__()
     |> Map.keys()
     |> List.delete(:__struct__)
     |> Enum.sort()
-  end
-
-  # The table rows of one section, each as its cells.
-  defp rows(heading) do
-    @conformance
-    |> File.read!()
-    |> String.split(heading)
-    |> Enum.at(1)
-    |> String.split("\n## ")
-    |> hd()
-    |> String.split("\n")
-    |> Enum.filter(&String.starts_with?(&1, "| `"))
-    |> Enum.map(&cells/1)
-  end
-
-  defp law([id, sentence, controls]) do
-    %Law{id: String.trim(id, "`"), sentence: sentence, controls: String.split(controls, ", ")}
-  end
-
-  defp guarantee([id, sentence]), do: {String.trim(id, "`"), sentence}
-
-  defp cells(line) do
-    line
-    |> String.split("|")
-    |> Enum.drop(1)
-    |> Enum.drop(-1)
-    |> Enum.map(&String.trim/1)
   end
 end

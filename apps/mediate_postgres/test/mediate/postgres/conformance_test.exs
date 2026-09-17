@@ -2,7 +2,7 @@ defmodule Mediate.Postgres.ConformanceTest do
   use Mediate.Conformance.AdapterCase,
     adapter: Mediate.Postgres,
     repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Fixture.World,
+    world: Mediate.Conformance.Fixture.World,
     sandbox: Mediate.Dev.Sandbox,
     async: false,
     setup_queries: 2,

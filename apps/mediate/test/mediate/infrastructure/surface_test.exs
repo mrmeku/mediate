@@ -14,32 +14,13 @@ defmodule Mediate.Infrastructure.SurfaceTest.ReadOnlyRepo do
   use Mediate.Repo
 end
 
-defmodule Mediate.Infrastructure.SurfaceTest.ReadOnlyRepoCase do
-  @moduledoc false
-  use Mediate.Conformance.RepoCase, repo: Mediate.Infrastructure.SurfaceTest.ReadOnlyRepo, async: true
-
-  alias Mediate.Conformance.RepoCase
-  alias Mediate.Infrastructure.SurfaceTest.ReadOnlyRepo
-
-  setup_all do
-    config = Application.get_env(:mediate, Mediate.TestRepos.Sandboxed)
-    start_supervised!({ReadOnlyRepo, config})
-    :ok
-  end
-
-  test "a read-only repo exports a subset of the surface and passes the surface assertion" do
-    refute function_exported?(ReadOnlyRepo, :insert, 2)
-    assert :ok = RepoCase.assert_surface(ReadOnlyRepo)
-  end
-end
-
 defmodule Mediate.Infrastructure.SurfaceTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Mediate.Conformance.RepoCase
   alias Mediate.Infrastructure.Surface
   alias Mediate.Infrastructure.SurfaceTest.ExtraRepo
+  alias Mediate.Infrastructure.SurfaceTest.ReadOnlyRepo
   alias Mediate.TestRepos.Owner
   alias Mediate.TestRepos.Sandboxed
 
@@ -60,16 +41,10 @@ defmodule Mediate.Infrastructure.SurfaceTest do
     assert Surface.bucket(:extra, 1) == nil
   end
 
-  test "a repo exporting a function outside the surface fails with the function's name and arity" do
-    assert_raise ExUnit.AssertionError,
-                 ~r/exports extra\/1, which the surface this build was written against does not classify/,
-                 fn ->
-                   RepoCase.assert_surface(ExtraRepo)
-                 end
-  end
-
-  test "a repo without the seam fails the surface assertion" do
-    assert_raise ExUnit.AssertionError, ~r/does not use Mediate.Repo/, fn -> RepoCase.assert_surface(Enum) end
+  test "the seam overrides what a repo defines, so a repo answers the surface Ecto gave it" do
+    assert Enum.sort(ExtraRepo.__info__(:functions)) -- [{:extra, 1}] == Enum.sort(Sandboxed.__info__(:functions))
+    refute function_exported?(ReadOnlyRepo, :insert, 2)
+    assert function_exported?(ReadOnlyRepo, :all, 2)
   end
 
   test "use Mediate.Repo before use Ecto.Repo raises at compile time" do

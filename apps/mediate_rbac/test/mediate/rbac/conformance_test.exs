@@ -3,7 +3,7 @@ defmodule Mediate.Rbac.ConformanceTest do
     async: false,
     adapter: Mediate.Rbac,
     repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Fixture.World,
+    world: Mediate.Conformance.Fixture.World,
     sandbox: Mediate.Dev.Sandbox,
     committed: [
       repo: Mediate.TestRepos.Committed,

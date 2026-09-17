@@ -47,20 +47,21 @@ defmodule Mediate.Rbac.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   # lib depends on the library, ecto, and telemetry alone. ecto_sql and
-  # postgrex serve the test run. stream_data carries no `only:` because the
-  # library's conformance templates ship in lib, so the library carries it
-  # in every environment. Every pin is exact. Versions verified against
+  # postgrex serve the test run, as the conformance package and stream_data
+  # do: an adopter of this adapter proves it and does not ship the proof.
+  # Every pin is exact. Versions verified against
   # https://hex.pm/api/packages/<name> on 2026-09-08.
   defp deps do
     [
       {:mediate, in_umbrella: true},
       {:mediate_dev, in_umbrella: true, only: :test},
+      {:mediate_conformance, in_umbrella: true, only: :test},
       {:ecto, "3.14.2"},
       {:nimble_options, "1.1.1"},
       {:telemetry, "1.4.2"},
       {:ecto_sql, "3.14.0", only: :test},
       {:postgrex, "0.22.4", only: :test},
-      {:stream_data, "1.4.0"},
+      {:stream_data, "1.4.0", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},

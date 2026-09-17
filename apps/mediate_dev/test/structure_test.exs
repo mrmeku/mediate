@@ -40,7 +40,7 @@ defmodule StructureTest do
   @umbrella Path.expand("../../..", __DIR__)
 
   # The packages that ship to Hex, whose interior is not their interface.
-  @published ~w(mediate mediate_rbac mediate_postgres mediate_cerbos mediate_fga)
+  @published ~w(mediate mediate_conformance mediate_rbac mediate_postgres mediate_cerbos mediate_fga)
 
   @exceptions %{
     "apps/example/lib/example/domain/document.ex" =>

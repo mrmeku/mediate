@@ -10,9 +10,9 @@ defmodule Mediate.Rbac.Conformance.Predicates do
 
   import Ecto.Query, only: [dynamic: 2, from: 2]
 
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Fixture.Account
   alias Mediate.Fixture.Membership
-  alias Mediate.Fixture.World
 
   @doc "The subject's account carries the clearance the fixture's rule asks for."
   @spec cleared(Mediate.subject(), Mediate.environment()) :: Ecto.Query.dynamic_expr()

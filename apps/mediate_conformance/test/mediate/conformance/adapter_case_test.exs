@@ -3,10 +3,10 @@ defmodule Mediate.Conformance.AdapterCaseTest do
     async: false,
     adapter: Mediate.Test.Fake,
     repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Fixture.World,
+    world: Mediate.Conformance.Fixture.World,
     sandbox: Mediate.Dev.Sandbox,
-    seed: Mediate.Test.FakeSeed,
-    outage: Mediate.Test.FakeSeed,
+    seed: Mediate.Conformance.Fixture.Seed,
+    outage: Mediate.Conformance.Fixture.Seed,
     committed: [
       repo: Mediate.TestRepos.Committed,
       owner: Mediate.TestRepos.Owner,
@@ -35,9 +35,9 @@ defmodule Mediate.Conformance.AdapterCaseSettlingTest do
     async: false,
     adapter: Mediate.Test.SettlingAdapter,
     repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Fixture.World,
+    world: Mediate.Conformance.Fixture.World,
     sandbox: Mediate.Dev.Sandbox,
-    seed: Mediate.Test.FakeSeed
+    seed: Mediate.Conformance.Fixture.Seed
 
   alias Mediate.Test.Fake
   alias Mediate.Test.SettlingAdapter

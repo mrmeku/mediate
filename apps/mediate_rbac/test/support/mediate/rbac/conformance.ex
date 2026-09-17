@@ -8,6 +8,6 @@ defmodule Mediate.Rbac.Conformance do
 
   use Boundary,
     top_level?: true,
-    deps: [Mediate, Mediate.Conformance, Mediate.Rbac, Mediate.Fixture, Ecto],
+    deps: [Mediate, Mediate.Conformance, Mediate.Conformance.Fixture, Mediate.Rbac, Mediate.Fixture, Ecto],
     exports: [Assignment, Predicates, Roles, Tightened, Versions]
 end

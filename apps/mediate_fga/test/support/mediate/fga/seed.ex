@@ -23,16 +23,18 @@ defmodule Mediate.Fga.Seed do
 
   @behaviour Mediate.Conformance.Seed
 
-  use Boundary, top_level?: true, deps: [Mediate, Mediate.Conformance, Mediate.Fga, Mediate.Fixture]
+  use Boundary,
+    top_level?: true,
+    deps: [Mediate, Mediate.Conformance, Mediate.Conformance.Fixture, Mediate.Fga, Mediate.Fixture]
 
   alias Mediate.Config
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Fga
   alias Mediate.Fga.Client.Http
   alias Mediate.Fga.Client.Page
   alias Mediate.Fga.Client.Read
   alias Mediate.Fga.Client.Write
   alias Mediate.Fga.TupleKey
-  alias Mediate.Fixture.World
 
   @batch 100
 

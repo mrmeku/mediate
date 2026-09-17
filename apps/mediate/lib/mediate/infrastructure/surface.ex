@@ -2,8 +2,8 @@ defmodule Mediate.Infrastructure.Surface do
   @moduledoc false
   # Every function `use Ecto.Repo` defines, by name and arity, in exactly one
   # of four buckets. The list holds for Ecto 3.14 and ecto_sql 3.14.
-  # `Mediate.Conformance.RepoCase` diffs it against a compiled Repo's
-  # exports, so a release that adds a function fails that test by name.
+  # The repo template of `mediate_conformance` diffs it against a compiled
+  # Repo's exports, so a release that adds a function fails that test by name.
   #
   # - *query*: `prepare_query/3` judges it, and the seam wraps it.
   # - *write*: the seam overrides it. It judges, records, and wraps.

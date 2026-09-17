@@ -1,4 +1,4 @@
-defmodule Mediate.Fixture.Rows do
+defmodule Mediate.Conformance.Fixture.Rows do
   @moduledoc """
   What `Mediate.Conformance.RepoCase` writes when the core package holds
   its own sandboxed repo to the five guarantees. The audited row is a

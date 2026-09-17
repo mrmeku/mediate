@@ -33,7 +33,7 @@ A subject is `{kind, id}`, and an object is `{type, id}`. The `Mediate` moduledo
 | Cerbos | `mediate_cerbos` | policy files | one sidecar |
 | OpenFGA | `mediate_fga` | a model and a tuple store | a server and its datastore |
 
-Each adapter's README says how to bind it. Each has a thin application that binds it to one example domain: [`example_rbac`](apps/example_rbac/README.md), [`example_postgres`](apps/example_postgres/README.md), [`example_cerbos`](apps/example_cerbos/README.md), and [`example_fga`](apps/example_fga/README.md).
+Each adapter's README says how to bind it. An adapter of your own takes `mediate_conformance` in the test environment, whose suites hold it to `docs/conformance.md`. Each adapter here has a thin application that binds it to one example domain: [`example_rbac`](apps/example_rbac/README.md), [`example_postgres`](apps/example_postgres/README.md), [`example_cerbos`](apps/example_cerbos/README.md), and [`example_fga`](apps/example_fga/README.md).
 
 ## Quickstart
 

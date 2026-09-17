@@ -7,12 +7,12 @@ defmodule Mediate.Cerbos.PlanTest do
   alias Mediate.Cerbos.Binding
   alias Mediate.Cerbos.Infrastructure.Decide
   alias Mediate.Cerbos.Infrastructure.Plan
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev
   alias Mediate.Dev.Sandbox
   alias Mediate.Error
   alias Mediate.Fixture.Folder
   alias Mediate.Fixture.Item
-  alias Mediate.Fixture.World
   alias Mediate.Test
   alias Mediate.TestRepos.Sandboxed
 

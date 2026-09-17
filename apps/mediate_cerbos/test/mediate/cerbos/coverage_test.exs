@@ -7,12 +7,12 @@ defmodule Mediate.Cerbos.CoverageTest do
   alias Mediate.Cerbos.Conformance.Attributes
   alias Mediate.Cerbos.Coverage
   alias Mediate.Cerbos.Infrastructure.Decide
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev
   alias Mediate.Dev.Sandbox
   alias Mediate.Fixture.Folder
   alias Mediate.Fixture.Item
   alias Mediate.Fixture.Membership
-  alias Mediate.Fixture.World
   alias Mediate.Test
   alias Mediate.TestRepos.Sandboxed
 

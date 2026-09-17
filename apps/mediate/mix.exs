@@ -48,17 +48,17 @@ defmodule Mediate.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  # The conformance templates ship in lib, so an adapter outside this
-  # repository can run them. So the generators and the mock under them are
-  # dependencies of the package and not of its own suite. `ecto_sql` is
-  # optional, because an application that takes the port without the seam
-  # needs `ecto` alone.
+  # `ecto_sql` is optional, because an application that takes the port
+  # without the seam needs `ecto` alone.
   #
-  # `postgrex` is the driver this package's own suite connects with. The
-  # population the suite proves the package over sits in `test/support`,
+  # `postgrex` is the driver this package's own suite connects with, and
+  # `stream_data` draws the population one property of that suite asks for.
+  # The schemas the suite proves the package over sit in `test/support`,
   # which the compiler sees and Hex never publishes. The cluster and
   # the sandbox setup come from `mediate_dev`, in the test environment
-  # alone. Every pin is exact. Versions verified against
+  # alone. The conformance templates are `mediate_conformance`, which
+  # depends on this package and which this package cannot name back.
+  # Every pin is exact. Versions verified against
   # https://hex.pm/api/packages/<name> on 2026-09-08.
   defp deps do
     [
@@ -68,7 +68,7 @@ defmodule Mediate.MixProject do
       {:telemetry, "1.4.2"},
       {:ecto_sql, "3.14.0", optional: true},
       {:postgrex, "0.22.4", only: :test},
-      {:stream_data, "1.4.0"},
+      {:stream_data, "1.4.0", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},

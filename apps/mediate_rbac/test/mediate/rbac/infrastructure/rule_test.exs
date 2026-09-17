@@ -4,11 +4,11 @@ defmodule Mediate.Rbac.RuleTest do
   import Ecto.Query, only: [where: 2]
 
   alias Mediate.Answer
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev.Sandbox
   alias Mediate.Fixture.Folder
   alias Mediate.Fixture.Item
   alias Mediate.Fixture.Membership
-  alias Mediate.Fixture.World
   alias Mediate.Rbac.Binding
   alias Mediate.Rbac.Conformance.Seat
   alias Mediate.Rbac.Infrastructure.Rule

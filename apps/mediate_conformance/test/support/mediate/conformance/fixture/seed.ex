@@ -1,4 +1,4 @@
-defmodule Mediate.Test.FakeSeed do
+defmodule Mediate.Conformance.Fixture.Seed do
   @moduledoc """
   The fake adapter's conformance hooks. `seed/1` rewrites the fake's rule
   table from a world, one entry per grant the world's rule allows.
@@ -9,11 +9,9 @@ defmodule Mediate.Test.FakeSeed do
 
   @behaviour Mediate.Conformance.Seed
 
-  use Boundary, top_level?: true, deps: [Mediate, Mediate.Conformance, Mediate.Fixture, Mediate.Test]
-
   alias Mediate.Config
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Conformance.Seed
-  alias Mediate.Fixture.World
   alias Mediate.Test.Fake
 
   @impl Seed

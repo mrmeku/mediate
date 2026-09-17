@@ -2,7 +2,7 @@
 
 *What must an adapter and a mediated repo satisfy? For someone who writes an adapter or binds a repo.*
 
-A law is one test in `Mediate.Conformance.AdapterCase`, named by a law id and one sentence. An adapter is conformant when every law passes against its real engine over a population it did not write. A law an adapter cannot run prints its reason and never skips in silence. `Mediate.Conformance.Law.all/0` holds the table below as data, and the freeze test in `mediate` holds it to this document row for row.
+A law is one test in `Mediate.Conformance.AdapterCase`, named by a law id and one sentence. An adapter is conformant when every law passes against its real engine over a population it did not write. A law an adapter cannot run prints its reason and never skips in silence. `Mediate.Conformance.Law.all/0` holds the table below as data, and the freeze test in `mediate_conformance` holds it to this document row for row.
 
 ## The laws
 

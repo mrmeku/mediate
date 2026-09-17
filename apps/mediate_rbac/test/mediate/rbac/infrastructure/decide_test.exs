@@ -4,10 +4,10 @@ defmodule Mediate.Rbac.DecideTest do
   import Ecto.Query, only: [dynamic: 2]
 
   alias Mediate.Answer
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev.Sandbox
   alias Mediate.Error
   alias Mediate.Fixture.Folder
-  alias Mediate.Fixture.World
   alias Mediate.Rbac.Binding
   alias Mediate.Rbac.Conformance.Roles
   alias Mediate.TestRepos.Sandboxed

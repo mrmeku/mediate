@@ -4,12 +4,12 @@ defmodule Mediate.Cerbos.ValuesTest do
   alias Mediate.Cerbos.Binding
   alias Mediate.Cerbos.Conformance.Memberships
   alias Mediate.Cerbos.Infrastructure.Values
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev
   alias Mediate.Dev.Sandbox
   alias Mediate.Fixture.Account
   alias Mediate.Fixture.Folder
   alias Mediate.Fixture.Membership
-  alias Mediate.Fixture.World
   alias Mediate.Test
   alias Mediate.TestRepos.Sandboxed
 

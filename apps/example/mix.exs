@@ -57,21 +57,22 @@ defmodule Example.MixProject do
   end
 
   # lib depends on the library, on ecto and ecto_sql for the migration
-  # helper and preload, and on telemetry. stream_data carries no `only:`
-  # because the library's conformance templates ship in lib. So the library
-  # carries it in every environment, and a dependent that narrows it
-  # disagrees with the library. Every pin is exact. Versions verified
+  # helper and preload, and on telemetry. The conformance package and
+  # stream_data serve the test run, where the repo answers the guarantees
+  # and the domain answers its properties. Every pin is exact. Versions
+  # verified
   # against https://hex.pm/api/packages/<name> on 2026-09-08.
   defp deps do
     [
       {:mediate, in_umbrella: true},
       {:mediate_dev, in_umbrella: true, only: :test},
+      {:mediate_conformance, in_umbrella: true, only: :test},
       {:ecto, "3.14.2"},
       {:ecto_sql, "3.14.0"},
       {:postgrex, "0.22.4"},
       {:nimble_options, "1.1.1"},
       {:telemetry, "1.4.2"},
-      {:stream_data, "1.4.0"},
+      {:stream_data, "1.4.0", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},

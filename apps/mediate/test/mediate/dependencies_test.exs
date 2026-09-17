@@ -3,11 +3,11 @@ defmodule Mediate.DependenciesTest do
 
   # The first of the two numbers the plan runs in CI. An adopter installs
   # and starts every dependency this package carries. So the count is the
-  # promise the package makes about its own size, and a fifth one is a
+  # promise the package makes about its own size, and a fourth one is a
   # decision rather than an accident.
-  @runtime ~w[ecto nimble_options stream_data telemetry]a
+  @runtime ~w[ecto nimble_options telemetry]a
 
-  test "the runtime dependencies are the four the plan names, and no more" do
+  test "the runtime dependencies are the three the plan names, and no more" do
     assert Enum.sort(runtime(Mix.Project.config()[:deps])) == @runtime
   end
 

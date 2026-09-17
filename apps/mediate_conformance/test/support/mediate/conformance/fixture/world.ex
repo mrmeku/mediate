@@ -1,4 +1,4 @@
-defmodule Mediate.Fixture.World do
+defmodule Mediate.Conformance.Fixture.World do
   @moduledoc """
   A population of the neutral fixture and the rule it obeys. It is this
   repository's `Mediate.Conformance.World`. A population holds accounts

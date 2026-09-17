@@ -1,9 +1,9 @@
-defmodule Mediate.Fga.MixProject do
+defmodule Mediate.Conformance.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :mediate_fga,
+      app: :mediate_conformance,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -14,7 +14,7 @@ defmodule Mediate.Fga.MixProject do
       elixirc_options: [warnings_as_errors: true, infer_signatures: true, no_warn_undefined: []],
       compilers: [:boundary] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
-      test_coverage: test_coverage(),
+      test_coverage: [summary: [threshold: 90]],
       aliases: aliases(),
       hex: hex(),
       deps: deps(),
@@ -26,51 +26,28 @@ defmodule Mediate.Fga.MixProject do
     [preferred_envs: [quality: :test]]
   end
 
-  # `:inets` carries `httpc`, which `Mediate.Fga.Client.Http` asks the
-  # server with. The package that calls it starts it, so an adopter of this
-  # package does not have to know its transport.
   def application do
-    [extra_applications: [:logger, :inets]]
-  end
-
-  # The coverage a run measures. A run with MEDIATE_DOMAIN_COVERAGE set
-  # ignores every module outside a `domain/` and holds the rest to every
-  # line. A module that decides and touches nothing can meet that. Any
-  # other run is the ordinary one, and its threshold is a floor under the
-  # application as a whole.
-  defp test_coverage do
-    if System.get_env("MEDIATE_DOMAIN_COVERAGE") do
-      [summary: [threshold: 100], ignore_modules: [~r/^(?!.*\.Domain\.)/]]
-    else
-      [summary: [threshold: 90]]
-    end
+    [extra_applications: [:logger]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  # ecto_sql carries no `only:` because the migration helpers ship in lib.
-  # postgrex carries no `only:` because the relay's cursor and lock are
-  # Postgres, so an application that runs the drain runs it on Postgres.
-  # telemetry carries no `only:` because the real client emits one event per
-  # call from lib. The conformance package and stream_data serve the test run,
-  # where this adapter proves itself against the laws.
-  #
-  # muontrap serves the test run alone, where it
-  # starts the one server the suite asks for. Every pin is exact. Versions
-  # verified against https://hex.pm/api/packages/<name> on 2026-09-09.
+  # The templates ship in lib, so an adopter's suite draws a population from
+  # them. stream_data carries no `only:` for that reason, and telemetry is
+  # here because the audit laws attach a handler. ecto_sql and postgrex
+  # serve this package's own run of the repo template. Every pin is exact.
+  # Versions verified against https://hex.pm/api/packages/<name> on
+  # 2026-09-08.
   defp deps do
     [
       {:mediate, in_umbrella: true},
       {:mediate_dev, in_umbrella: true, only: :test},
-      {:mediate_conformance, in_umbrella: true, only: :test},
       {:ecto, "3.14.2"},
-      {:ecto_sql, "3.14.0"},
-      {:nimble_options, "1.1.1"},
-      {:postgrex, "0.22.4"},
-      {:stream_data, "1.4.0", only: :test},
       {:telemetry, "1.4.2"},
-      {:muontrap, "2.0.0", only: :test},
+      {:stream_data, "1.4.0"},
+      {:ecto_sql, "3.14.0", only: :test},
+      {:postgrex, "0.22.4", only: :test},
       {:boundary, "0.10.4", runtime: false},
       {:credo, "1.7.19", only: [:dev, :test], runtime: false},
       {:mediate_credo, in_umbrella: true, only: [:dev, :test], runtime: false},
@@ -81,7 +58,7 @@ defmodule Mediate.Fga.MixProject do
   end
 
   defp docs do
-    [main: "readme", extras: ["README.md": [title: "Mediate FGA"]]]
+    [main: "readme", extras: ["README.md": [title: "Mediate conformance"]]]
   end
 
   # CVE-2026-32686 (GHSA-rhv4-8758-jx7v): an unbounded exponent when decimal

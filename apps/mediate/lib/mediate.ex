@@ -15,9 +15,9 @@ defmodule Mediate do
     subject under the reviewer's operation id, with `nil` ids alike.
 
   This module is the top-layer boundary. Everything under `Mediate` that is
-  not `Mediate.Test` or `Mediate.Conformance` belongs to it. It can reach
-  `Ecto` and `NimbleOptions`. It reaches nothing from `ecto_sql` or
-  `postgrex`, because the port decides and does not query.
+  not `Mediate.Test` belongs to it. It can reach `Ecto` and `NimbleOptions`.
+  It reaches nothing from `ecto_sql` or `postgrex`, because the port decides
+  and does not query.
   """
 
   use Boundary,

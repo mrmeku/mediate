@@ -1,6 +1,7 @@
 defmodule Mediate.Fga.Client.HttpTest do
   use ExUnit.Case, async: true
 
+  alias Mediate.Conformance.Fixture.World
   alias Mediate.Dev
   alias Mediate.Error
   alias Mediate.Fga.Client.Check
@@ -12,7 +13,6 @@ defmodule Mediate.Fga.Client.HttpTest do
   alias Mediate.Fga.Condition
   alias Mediate.Fga.Model
   alias Mediate.Fga.TupleKey
-  alias Mediate.Fixture.World
 
   @moduletag :fga
   @asking %{"subject_kind" => "user", "current_time" => "2026-09-09T12:00:00Z"}

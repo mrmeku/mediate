@@ -15,19 +15,7 @@ defmodule Mediate.Fixture do
   cycle between files.
   """
 
-  use Boundary,
-    top_level?: true,
-    deps: [
-      Ecto,
-      ExUnitProperties,
-      StreamData,
-      Mediate,
-      Mediate.Conformance,
-      Mediate.Test,
-      Mediate.Dev.Sandbox,
-      Mediate.TestRepos
-    ],
-    exports: [Account, Folder, Item, Membership, Rows, World]
+  use Boundary, top_level?: true, deps: [Ecto, Mediate], exports: [Account, Folder, Item, Membership]
 end
 
 defmodule Mediate.Fixture.Item do

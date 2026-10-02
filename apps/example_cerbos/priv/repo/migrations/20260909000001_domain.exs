@@ -1,4 +1,4 @@
-defmodule ExampleCerbos.Repo.Migrations.Domain do
+defmodule ExampleCerbos.Migrations.Domain do
   @moduledoc false
   use Ecto.Migration
 

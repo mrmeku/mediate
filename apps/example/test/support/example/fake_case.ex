@@ -1,8 +1,9 @@
 defmodule Example.FakeCase do
   @moduledoc """
   The example's own test case: a sandbox connection, the world, and the
-  fake adapter bound for the test process. The contexts then face verdicts
-  the test sets and no rule. `allow/4` and `deny/4` set them.
+  fake engine bound for the test process. The application modules then
+  face decisions the test sets and no clause. `allow/4` and `revoke/4`
+  set them.
   """
 
   use Boundary,
@@ -29,20 +30,20 @@ defmodule Example.FakeCase do
     end
   end
 
-  @doc "The setup: sandbox, fake adapter, and the world."
+  @doc "The setup: sandbox, fake engine, and the world."
   @spec setup(map()) :: {:ok, keyword()}
   def setup(tags) when is_map(tags) do
     :ok = Sandbox.setup(Example.Infrastructure.Repo, tags)
-    rules = start_supervised!(%{id: Fake, start: {Fake, :start_link, []}})
-    :ok = Mediate.Test.with_config(adapter: {Fake, rules: rules})
-    {:ok, rules: rules, world: Example.Fixture.world!()}
+    fake = start_supervised!(%{id: Fake, start: {Fake, :start_link, []}})
+    :ok = Mediate.Test.with_config(engine: {Fake, rules: fake})
+    {:ok, fake: fake, world: Example.Fixture.world!()}
   end
 
-  @doc "Allow an operation for a subject on an object, or on every object of a type with `:any`."
+  @doc "Allow an action for a subject on a resource, or on every resource of a type with `:any`."
   @spec allow(pid(), String.t() | :any, atom(), {atom(), term()}) :: :ok
-  def allow(rules, subject, operation, object), do: Fake.allow(rules, subject, operation, object)
+  def allow(fake, subject, action, resource), do: Fake.allow(fake, subject, action, resource)
 
   @doc "Revoke what `allow/4` gave."
-  @spec deny(pid(), String.t() | :any, atom(), {atom(), term()}) :: :ok
-  def deny(rules, subject, operation, object), do: Fake.revoke(rules, subject, operation, object)
+  @spec revoke(pid(), String.t() | :any, atom(), {atom(), term()}) :: :ok
+  def revoke(fake, subject, action, resource), do: Fake.revoke(fake, subject, action, resource)
 end

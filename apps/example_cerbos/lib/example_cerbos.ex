@@ -1,36 +1,39 @@
 defmodule ExampleCerbos do
   @moduledoc """
-  The example bound to a policy sidecar. Nothing of the domain lives here.
+  The example under policy files. Nothing of the domain lives here.
 
-  The package holds:
+  The deployment holds four things:
 
-  - the attribute declarations, which say what the policies can read
-  - the subqueries behind them
-  - the policy files the sidecar serves
-  - the boot, which binds them to `Example.Infrastructure.Repo`
-  - the migrations, which create the example's tables
+  - `ExampleCerbos.Infrastructure.Declarations`, which says what a policy
+    file can read
+  - `ExampleCerbos.Infrastructure.Subqueries`, the subquery behind each
+    attribute whose value depends on who asks
+  - the policy files under `priv/policies`, which a Cerbos server serves
+  - `ExampleCerbos.Application`, the boot that binds them to
+    `Example.Infrastructure.Repo`, and the migrations, which raise the
+    example's tables
 
-  A directory of policy files carries no history. The `version` field
-  inside a policy file runs variants side by side and not one after
-  another. So the version identifier is the commit of the repository the
-  files come from (`Mediate.Cerbos.Version`). The commit arrives as
-  configuration: `POLICY_COMMIT` in a deployment, a pinned string in the
-  test configuration. A published version carries the files as its content
-  under the cap.
+  A directory of policy files carries no history, and the `version` field
+  inside a policy file runs variants side by side. So the policy version is
+  the commit of the repository the files come from, which
+  `Mediate.Cerbos.Version` says. The commit arrives as configuration:
+  `POLICY_COMMIT` in a deployment, a pinned string in the test
+  configuration. The policy release carries the files as its text, under
+  the cap.
   """
 
   use Boundary,
     deps: [Example, Mediate, Mediate.Cerbos, Ecto],
-    exports: [Application, Infrastructure.Attributes, Infrastructure.Facts]
+    exports: [Application, Infrastructure.Declarations, Infrastructure.Subqueries]
 
-  @author "example_cerbos"
-  @approval "the rules in docs/example.md, as policy files under review"
+  @author "the Mediate maintainers"
+  @approval "the thirteen clauses of docs/example.md"
 
-  @doc "Who wrote the rules, as the record of a policy version carries it."
+  @doc "Who wrote the policy, as the policy release carries it."
   @spec author() :: String.t()
   def author, do: @author
 
-  @doc "What approved them, as the record of a policy version carries it."
+  @doc "What approved it, as the policy release carries it."
   @spec approval() :: String.t()
   def approval, do: @approval
 end

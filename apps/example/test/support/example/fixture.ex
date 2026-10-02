@@ -1,10 +1,10 @@
 defmodule Example.Fixture do
   @moduledoc """
-  The world every scenario starts from. The fixture inserts it through the
-  seam under a declared exemption. It has two enterprises, each with a team
-  and a project, and labels with and without implied restrictions. Each
-  account holds one role, so a scenario can name the account for the role it
-  tests. A scenario adds repositories through `repository!/2`.
+  The world every scenario starts from. The fixture inserts it through
+  the mediated repo under a declared exemption. It has two enterprises,
+  each with a team and a project, and labels with and without implied
+  restrictions. Each account holds one grant, so a scenario can name the
+  account for the grant it tests. A scenario adds repositories through `repository!/2`.
 
   | Account | Kind | Employment | Country | Holds |
   |---|---|---|---|---|
@@ -23,11 +23,12 @@ defmodule Example.Fixture do
   use Boundary,
     top_level?: true,
     deps: [Example, Ecto, Mediate, Mediate.Conformance, Mediate.Test, Mediate.Dev.Sandbox],
-    exports: [Rows]
+    exports: [Specimen]
 
   import Ecto.Query, only: [from: 2]
 
   alias Example.Application.Accounts
+  alias Example.Domain.Account
   alias Example.Domain.Directory
   alias Example.Domain.Enterprise
   alias Example.Domain.Label
@@ -35,15 +36,14 @@ defmodule Example.Fixture do
   alias Example.Domain.Repository
   alias Example.Domain.Rollup
   alias Example.Domain.Team
-  alias Example.Domain.User
   alias Example.Domain.Visibility
   alias Example.Infrastructure.Repo
 
   @exempt {:exempt, "fixture: the world a scenario starts from"}
 
   # Children before parents, which is the order rows leave in.
-  @domain ~w(override_reports visibility_proposals directories visibilities repositories team_roles memberships
-    account_roles users projects teams enterprises labels)
+  @domain ~w(override_reports proposals directories visibilities repositories team_roles memberships
+    permissions accounts projects teams enterprises labels)
 
   @accounts [
     {"ann", :user, :employee, "US", "ann"},
@@ -85,15 +85,15 @@ defmodule Example.Fixture do
     {enterprise, team, project} = tenant!("Acme", "US")
     {other_enterprise, other_team, other_project} = tenant!("Globex", "FR")
     accounts!()
-    Accounts.assign("ann", project.id, :contributor)
-    Accounts.assign("bob", project.id, :contributor)
-    Accounts.assign("carl", project.id, :contributor)
-    Accounts.assign("gil-user", project.id, :contributor)
-    Accounts.team_role("dana", team.id, :admin)
-    Accounts.team_role("eve", team.id, :reviewer)
+    Accounts.add_membership("ann", project.id, :contributor)
+    Accounts.add_membership("bob", project.id, :contributor)
+    Accounts.add_membership("carl", project.id, :contributor)
+    Accounts.add_membership("gil-user", project.id, :contributor)
+    Accounts.add_team_role("dana", team.id, :admin)
+    Accounts.add_team_role("eve", team.id, :reviewer)
     Accounts.grant_override("gil")
-    Accounts.team_role("hana", other_team.id, :admin)
-    Accounts.assign("ivan", other_project.id, :contributor)
+    Accounts.add_team_role("hana", other_team.id, :admin)
+    Accounts.add_membership("ivan", other_project.id, :contributor)
 
     %__MODULE__{
       enterprise: enterprise,
@@ -128,30 +128,30 @@ defmodule Example.Fixture do
           project_id: project.id,
           owning_team_id: team.id
         },
-        mediate: @exempt
+        authorized_by: @exempt
       )
 
     directories =
       for attrs <- Keyword.get(opts, :directories, []) do
-        Repo.insert!(struct!(%Directory{repository_id: repository.id}, attrs), mediate: @exempt)
+        Repo.insert!(struct!(%Directory{repository_id: repository.id}, attrs), authorized_by: @exempt)
       end
 
     %{repository | visibility: visibility!(repository, opts, directories), directories: directories}
   end
 
-  @doc "Replace the accounts a repository invites, as the fixture, outside any rule."
+  @doc "Replace a repository's invited list, as the fixture, outside any clause."
   @spec set_invited!(Repository.t(), [String.t()]) :: Visibility.t()
   def set_invited!(%Repository{id: id}, accounts) when is_list(accounts) do
     query = from(v in Visibility, where: v.repository_id == ^id)
-    visibility = Repo.one!(query, mediate: @exempt)
-    Repo.update!(Ecto.Changeset.change(visibility, invited: accounts), mediate: @exempt)
+    visibility = Repo.one!(query, authorized_by: @exempt)
+    Repo.update!(Ecto.Changeset.change(visibility, invited: accounts), authorized_by: @exempt)
   end
 
   @doc "Archive a project now, as the fixture."
   @spec archive_project!(Project.t()) :: Project.t()
   def archive_project!(%Project{} = project) do
     now = DateTime.utc_now(:second)
-    Repo.update!(Ecto.Changeset.change(project, archived_at: now), mediate: @exempt)
+    Repo.update!(Ecto.Changeset.change(project, archived_at: now), authorized_by: @exempt)
   end
 
   @doc "The subject for an account of the world."
@@ -166,10 +166,10 @@ defmodule Example.Fixture do
   def subjects, do: Enum.map(account_ids(), &subject/1)
 
   @doc "Insert an account with a country and an employment, that holds nothing."
-  @spec account!(String.t(), keyword()) :: User.t()
+  @spec account!(String.t(), keyword()) :: Account.t()
   def account!(id, opts \\ []) when is_binary(id) and is_list(opts) do
     Repo.insert!(
-      %User{
+      %Account{
         id: id,
         name: id,
         kind: Keyword.get(opts, :kind, :user),
@@ -177,14 +177,14 @@ defmodule Example.Fixture do
         employment: Keyword.get(opts, :employment, :employee),
         country: Keyword.get(opts, :country, "US")
       },
-      mediate: @exempt
+      authorized_by: @exempt
     )
   end
 
   @doc """
-  Empty every domain table through the owner-role repo, after a committed
-  test. A change event is already gone by then, since the library publishes
-  one and stores none.
+  Empty every domain table through the owner-role repo, after a durable
+  scenario. An identity write event is already gone by then, since the
+  library publishes one and stores none.
   """
   @spec truncate!(module()) :: :ok
   def truncate!(owner_repo) when is_atom(owner_repo) do
@@ -199,21 +199,21 @@ defmodule Example.Fixture do
       %Label{name: "docs", sensitive: false, implied_restrictions: [:employees_only]}
     ]
 
-    Enum.each(rows, &Repo.insert!(&1, mediate: @exempt))
+    Enum.each(rows, &Repo.insert!(&1, authorized_by: @exempt))
   end
 
   defp tenant!(name, country) do
-    enterprise = Repo.insert!(%Enterprise{name: name, country: country}, mediate: @exempt)
-    team = Repo.insert!(%Team{name: "#{name} team", enterprise_id: enterprise.id}, mediate: @exempt)
-    project = Repo.insert!(%Project{name: "#{name} project", team_id: team.id}, mediate: @exempt)
+    enterprise = Repo.insert!(%Enterprise{name: name, country: country}, authorized_by: @exempt)
+    team = Repo.insert!(%Team{name: "#{name} team", enterprise_id: enterprise.id}, authorized_by: @exempt)
+    project = Repo.insert!(%Project{name: "#{name} project", team_id: team.id}, authorized_by: @exempt)
     {enterprise, team, project}
   end
 
   defp accounts! do
     Enum.each(@accounts, fn {id, kind, employment, country, person} ->
       Repo.insert!(
-        %User{id: id, name: id, kind: kind, person_id: person, employment: employment, country: country},
-        mediate: @exempt
+        %Account{id: id, name: id, kind: kind, person_id: person, employment: employment, country: country},
+        authorized_by: @exempt
       )
     end)
   end
@@ -229,7 +229,7 @@ defmodule Example.Fixture do
         releasable_to: rollup.releasable_to,
         invited: Keyword.get(opts, :invited, [])
       },
-      mediate: @exempt
+      authorized_by: @exempt
     )
   end
 end

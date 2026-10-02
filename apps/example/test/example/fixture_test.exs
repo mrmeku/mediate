@@ -7,7 +7,10 @@ defmodule Example.FixtureTest do
     assert world.enterprise.country == "US" and world.other_enterprise.country == "FR"
     assert length(Fixture.subjects()) == 10
     assert Fixture.subject("gil") == {:privileged, "gil"}
-    assert %Example.Domain.User{kind: :user, employment: :contractor} = Fixture.account!("zed", employment: :contractor)
+
+    assert %Example.Domain.Account{kind: :user, employment: :contractor} =
+             Fixture.account!("zed", employment: :contractor)
+
     assert Fixture.account_ids() == ~w[ann bob carl dana eve frank gil gil-user hana ivan]
   end
 

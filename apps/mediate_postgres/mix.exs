@@ -8,7 +8,7 @@ defmodule Mediate.Postgres.MixProject do
     [
       app: :mediate_postgres,
       version: @version,
-      description: "Row-level security for Mediate: an authorization adapter whose rules are Postgres policies.",
+      description: "Row-level security for Mediate: an authorization engine whose rules are Postgres policies.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",
@@ -66,9 +66,9 @@ defmodule Mediate.Postgres.MixProject do
   # lib depends on the library, ecto, and telemetry alone. Every statement
   # it runs goes through the raw bucket of the mediated repo, so ecto_sql
   # and postgrex serve the test run, as the conformance package and
-  # stream_data do: an adopter of this adapter proves it and does not ship
+  # stream_data do: a deployment of this engine proves it and does not ship
   # the proof. Each published requirement is compatible rather than exact,
-  # so an adopter already on a later patch can install this package, and
+  # so a deployment already on a later patch can install this package, and
   # mix.lock holds the version and the checksum this repository builds
   # against. Versions verified against https://hex.pm/api/packages/<name> on
   # 2026-09-08.

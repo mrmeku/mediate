@@ -1,24 +1,20 @@
 defmodule Mediate.Postgres.ConformanceTest do
-  use Mediate.Conformance.AdapterCase,
-    adapter: Mediate.Postgres,
-    repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Conformance.Fixture.World,
-    sandbox: Mediate.Dev.Sandbox,
+  use Mediate.Conformance.EngineCase,
     async: false,
-    setup_queries: 2,
+    engine: Mediate.Postgres,
+    repo: Mediate.TestRepos.Sandboxed,
+    world: Mediate.Conformance.Reference.World,
+    setup: Mediate.Dev.Sandbox,
+    queries_per_call: 2,
     outage: Mediate.Postgres.ConformanceTest.Unreachable,
-    committed: [
-      repo: Mediate.TestRepos.Committed,
+    policy: Mediate.Postgres.Conformance.Policy,
+    durable: [
+      repo: Mediate.TestRepos.Durable,
       owner: Mediate.TestRepos.Owner,
-      tables: [
-        "mediate_fixture_memberships",
-        "mediate_fixture_items",
-        "mediate_fixture_folders",
-        "mediate_fixture_accounts"
-      ]
-    ],
-    versions: Mediate.Postgres.Conformance.Versions
+      tables: ~w(mediate_fixture_memberships mediate_fixture_items mediate_fixture_folders mediate_fixture_accounts)
+    ]
 
+  alias Mediate.Conformance.Outage
   alias Mediate.Postgres.Binding
 
   defmodule Stopped do
@@ -31,26 +27,20 @@ defmodule Mediate.Postgres.ConformanceTest do
   defmodule Unreachable do
     @moduledoc "The outage: the database is out of reach for the rest of the test."
 
-    @doc "Point the binding at the stopped repo, so the first statement any callback runs raises."
-    @spec outage() :: :ok
-    def outage, do: Binding.override(repo: Stopped)
+    @behaviour Outage
+
+    @impl Outage
+    def disconnect, do: Binding.override(repo: Stopped)
   end
 
-  # The template hands each test the repo of its tier, so the test makes
-  # the binding, not the boot. The sandboxed tier and the committed tier
-  # read the same policies through different connections.
+  # The case hands each test the repo of its tier, so the test makes the
+  # binding, not the boot. The sandboxed tier and the durable tier read
+  # the same rules through different connections.
   setup %{repo: repo} do
     :ok =
       Binding.override(
         repo: repo,
-        schemas: [
-          Mediate.Fixture.Account,
-          Mediate.Fixture.Folder,
-          Mediate.Fixture.Item,
-          Mediate.Fixture.Membership
-        ]
+        schemas: [Mediate.Fixture.Account, Mediate.Fixture.Folder, Mediate.Fixture.Item, Mediate.Fixture.Membership]
       )
-
-    :ok
   end
 end

@@ -1,17 +1,18 @@
 defmodule Example do
   @moduledoc """
   The example application: code hosting as a library application.
-  `docs/example.md` has the rules and the scenarios.
+  `docs/example.md` has the clauses and the scenarios.
 
   - `domain/` is what the example knows. It has the schemas with their
-    object types and fact declarations, the restriction vocabulary, the
-    arithmetic of rule C4, and the re-authentication window.
-  - `application/` is the contexts. Each calls the port and writes through
-    the seam.
+    resource types and fact declarations, the restriction vocabulary, the
+    arithmetic of clause C4, and the re-authentication window.
+  - `application/` is the application modules. Each asks Mediate and
+    writes through the mediated repo.
   - `infrastructure/` is the repos, the queries, the migration helper, and
-    the consumer that maps the events to the shape a security log takes.
+    the consumer that maps the events to the OCSF records a security log
+    takes.
 
-  No module here names an adapter. A thin application binds one.
+  No module here names an engine. A deployment binds one.
   """
 
   use Boundary,
@@ -24,32 +25,32 @@ defmodule Example do
       NimbleOptions
     ],
     exports: [
+      Application.AccessReview,
       Application.Accounts,
       Application.Proposals,
       Application.Repositories,
       Application.Repositories.OverrideRefused,
       Application.Repositories.RollupViolation,
-      Application.Review,
-      Domain.AccountRole,
+      Domain.Account,
       Domain.Directory,
       Domain.Enterprise,
       Domain.Label,
       Domain.Membership,
       Domain.OverrideReport,
+      Domain.Permission,
       Domain.Project,
       Domain.Proposal,
+      Domain.Reauthentication,
       Domain.Repository,
       Domain.Restrictions,
       Domain.Rollup,
-      Domain.Sessions,
       Domain.Team,
       Domain.TeamRole,
-      Domain.User,
       Domain.Visibility,
       Infrastructure.Migration,
       Infrastructure.OwnerRepo,
       Infrastructure.Repo,
-      Infrastructure.Siem
+      Infrastructure.SIEM
     ]
 
   @schemas [
@@ -57,8 +58,8 @@ defmodule Example do
     Example.Domain.Team,
     Example.Domain.Project,
     Example.Domain.Label,
-    Example.Domain.User,
-    Example.Domain.AccountRole,
+    Example.Domain.Account,
+    Example.Domain.Permission,
     Example.Domain.Membership,
     Example.Domain.TeamRole,
     Example.Domain.Repository,

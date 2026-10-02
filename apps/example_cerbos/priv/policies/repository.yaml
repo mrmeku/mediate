@@ -1,18 +1,19 @@
-# The rules in docs/example.md over a repository, as one resource
-# policy. The allow rule is the access path (C1). The four deny rules are
-# the restrictions (C2), each over the restrictions effective on the
-# repository's rollup, which the attribute declaration derives (C3), and
-# each under the embargo date the request's own moment is compared with
-# (C5). The visibility actions are the owning team's (C7) under the
-# reauthentication window (C8).
+# The clauses of docs/example.md over a repository, as one policy file.
+# The allow rule is the access path (C1). The four deny rules are the
+# restriction kinds (C2), each over the kinds in effect on the repository's
+# rollup, which the declarations derive (C3), and each while the embargo
+# the call's own moment is compared with has not lifted (C5). The
+# visibility writes are an admin's of the owning team (C7) in a fresh
+# session (C8).
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: default
   resource: repository
   rules:
-    - actions: ["read", "checkout"]
+    - name: access_path
+      actions: ["read", "checkout"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           any:
@@ -22,9 +23,10 @@ resourcePolicy:
               - expr: '"admin" in request.resource.attr.team_roles'
               - expr: '"reviewer" in request.resource.attr.team_roles'
 
-    - actions: ["read"]
+    - name: employees_only
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -34,11 +36,12 @@ resourcePolicy:
               - any:
                   of:
                     - expr: request.resource.attr.embargo == null
-                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+                    - expr: request.resource.attr.embargo > request.principal.attr.context.now
 
-    - actions: ["read"]
+    - name: export_controlled
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -48,11 +51,12 @@ resourcePolicy:
               - any:
                   of:
                     - expr: request.resource.attr.embargo == null
-                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+                    - expr: request.resource.attr.embargo > request.principal.attr.context.now
 
-    - actions: ["read"]
+    - name: releasable_to
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -62,11 +66,12 @@ resourcePolicy:
               - any:
                   of:
                     - expr: request.resource.attr.embargo == null
-                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+                    - expr: request.resource.attr.embargo > request.principal.attr.context.now
 
-    - actions: ["read"]
+    - name: invite_only
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -76,27 +81,29 @@ resourcePolicy:
               - any:
                   of:
                     - expr: request.resource.attr.embargo == null
-                    - expr: request.resource.attr.embargo > request.principal.attr.environment.now
+                    - expr: request.resource.attr.embargo > request.principal.attr.context.now
 
-    - actions: ["change_visibility", "set_embargo", "lift_embargo"]
+    - name: admin_in_fresh_session
+      actions: ["change_visibility", "set_embargo", "lift_embargo"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
             of:
               - expr: '"admin" in request.resource.attr.team_roles'
-              - expr: request.principal.attr.environment.reauthenticated_at != null
+              - expr: request.principal.attr.context.reauthenticated_at != null
               - expr: >-
-                  timestamp(request.principal.attr.environment.reauthenticated_at)
-                  <= timestamp(request.principal.attr.environment.now)
+                  timestamp(request.principal.attr.context.reauthenticated_at)
+                  <= timestamp(request.principal.attr.context.now)
               - expr: >-
-                  timestamp(request.principal.attr.environment.reauthenticated_at)
-                  >= timestamp(request.principal.attr.environment.now) - duration("900s")
+                  timestamp(request.principal.attr.context.reauthenticated_at)
+                  >= timestamp(request.principal.attr.context.now) - duration("900s")
 
-    - actions: ["propose_visibility"]
+    - name: admin_of_owning_team
+      actions: ["propose_visibility"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           expr: '"admin" in request.resource.attr.team_roles'

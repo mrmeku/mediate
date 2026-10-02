@@ -6,12 +6,12 @@ defmodule Mediate.Infrastructure.CallerTest do
 
   test "library?/1 is true for Mediate and the modules under it, false for :any and others" do
     assert Caller.library?(Mediate)
-    assert Caller.library?(Mediate.Infrastructure.Seam)
+    assert Caller.library?(Mediate.Infrastructure.Enforcement)
     refute Caller.library?(:any)
     refute Caller.library?(Enum)
   end
 
-  test "module/1 names the first frame outside the repo, the seam, Ecto, and the standard library" do
+  test "module/1 names the first frame outside the repo, the mediated repo's own modules, Ecto, and the standard library" do
     frame = Caller.module(Sandboxed)
     assert frame == __MODULE__
   end

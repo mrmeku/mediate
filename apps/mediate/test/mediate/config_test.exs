@@ -7,14 +7,14 @@ defmodule Mediate.ConfigTest do
 
   defmodule NoOptions do
     @moduledoc false
-    @behaviour Mediate.Adapter
+    @behaviour Mediate.Engine
 
-    @impl Mediate.Adapter
-    def scope_cap, do: 100
-    @impl Mediate.Adapter
-    defdelegate decide(subject, operation, object, environment, options), to: Fake
-    @impl Mediate.Adapter
-    defdelegate scope(subject, operation, object_type, environment, options), to: Fake
+    @impl Mediate.Engine
+    def filter_limit, do: 100
+    @impl Mediate.Engine
+    defdelegate authorize(subject, action, resource, context, options), to: Fake
+    @impl Mediate.Engine
+    defdelegate filter(subject, action, resource_type, context, options), to: Fake
   end
 
   # The umbrella root starts every application before any suite runs, so a
@@ -25,75 +25,75 @@ defmodule Mediate.ConfigTest do
     on_exit(fn -> if booted, do: :persistent_term.put(Config, booted), else: :persistent_term.erase(Config) end)
   end
 
-  test "new/1 validates the adapter tuple, its options, and the defaults" do
-    assert {:ok, %Config{} = config} = Config.new(adapter: {Fake, verdict: :allow})
-    assert config.adapter == {Fake, verdict: :allow}
-    assert Config.adapter(config) == {Fake, verdict: :allow}
+  test "new/1 validates the engine tuple, its options, and the defaults" do
+    assert {:ok, %Config{} = config} = Config.new(engine: {Fake, effect: :allow})
+    assert config.engine == {Fake, effect: :allow}
+    assert Config.engine(config) == {Fake, effect: :allow}
     assert %DateTime{time_zone: "Etc/UTC"} = config.clock.()
-    assert config.caps == [policy_content_bytes: 65_536]
+    assert config.caps == [policy_text_bytes: 65_536]
   end
 
-  test "new/1 accepts a bare adapter module and fills its option defaults" do
-    assert {:ok, %Config{adapter: {Fake, verdict: :deny}} = config} = Config.new(adapter: Fake)
-    assert Config.adapter(config) == {Fake, verdict: :deny}
-    assert Config.adapter(%{config | adapter: Fake}) == {Fake, []}
+  test "new/1 accepts a bare engine module and fills its option defaults" do
+    assert {:ok, %Config{engine: {Fake, effect: :deny}} = config} = Config.new(engine: Fake)
+    assert Config.engine(config) == {Fake, effect: :deny}
+    assert Config.engine(%{config | engine: Fake}) == {Fake, []}
   end
 
-  test "new/1 rejects a missing field, a wrong option, and a module that is not an adapter" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid config: " <> _rest}} =
+  test "new/1 rejects a missing field, a wrong option, and a module that is not an engine" do
+    assert {:error, %Error{reason: :invalid, message: "invalid config: " <> _rest}} =
              Config.new(clock: &DateTime.utc_now/0)
 
-    assert {:error, %Error{reason: :invalid, detail: "invalid adapter: " <> detail}} =
-             Config.new(adapter: {Fake, verdict: :maybe})
+    assert {:error, %Error{reason: :invalid, message: "invalid engine: " <> message}} =
+             Config.new(engine: {Fake, effect: :maybe})
 
-    assert detail =~ "verdict"
+    assert message =~ "effect"
 
-    assert {:error, %Error{reason: :invalid, detail: "invalid adapter: " <> _rest}} =
-             Config.new(adapter: Enum)
+    assert {:error, %Error{reason: :invalid, message: "invalid engine: " <> _rest}} = Config.new(engine: Enum)
 
-    assert {:error, %Error{reason: :invalid, detail: "invalid adapter: " <> _rest}} =
-             Config.new(adapter: Mediate.NoSuchAdapter)
+    assert {:error, %Error{reason: :invalid, message: "invalid engine: " <> _rest}} =
+             Config.new(engine: Mediate.NoSuchEngine)
   end
 
-  test "new/1 rejects options for an adapter that declares no schema" do
-    assert {:ok, %Config{adapter: {NoOptions, []}}} = Config.new(adapter: NoOptions)
+  test "new/1 rejects options for an engine that declares no schema" do
+    assert {:ok, %Config{engine: {NoOptions, []}}} = Config.new(engine: NoOptions)
 
-    assert {:error, %Error{reason: :invalid, detail: "invalid adapter: " <> detail}} =
-             Config.new(adapter: {NoOptions, x: 1})
+    assert {:error, %Error{reason: :invalid, message: "invalid engine: " <> message}} =
+             Config.new(engine: {NoOptions, x: 1})
 
-    assert detail =~ "takes no options"
+    assert message =~ "takes no options"
   end
 
   test "new!/1 raises the error" do
     assert_raise Error, ~r/invalid config/, fn -> Config.new!([]) end
-    assert %Config{} = Config.new!(adapter: Fake)
+    assert %Config{} = Config.new!(engine: Fake)
   end
 
   test "resolve/0 fails when nothing is booted and nothing is overridden" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid config: nothing booted and no override"}} = Config.resolve()
+    assert {:error, %Error{reason: :invalid, message: "invalid config: nothing booted and no override"}} =
+             Config.resolve()
   end
 
   test "resolve/0 answers from the override alone" do
-    Mediate.Test.with_config(adapter: Fake)
-    assert {:ok, %Config{adapter: {Fake, verdict: :deny}}} = Config.resolve()
+    Mediate.Test.with_config(engine: Fake)
+    assert {:ok, %Config{engine: {Fake, effect: :deny}}} = Config.resolve()
   end
 
   test "resolve/0 merges the override onto the boot struct and round-trips through to_keyword/1" do
-    booted = Config.boot!(adapter: Fake, caps: [policy_content_bytes: 512])
+    booted = Config.boot!(engine: Fake, caps: [policy_text_bytes: 512])
     assert Config.new!(Config.to_keyword(booted)) == booted
     assert {:ok, ^booted} = Config.resolve()
 
-    Mediate.Test.with_config([caps: [policy_content_bytes: 8]], fn ->
-      assert {:ok, %Config{caps: [policy_content_bytes: 8]}} = Config.resolve()
+    Mediate.Test.with_config([caps: [policy_text_bytes: 8]], fn ->
+      assert {:ok, %Config{caps: [policy_text_bytes: 8]}} = Config.resolve()
     end)
 
     assert {:ok, ^booted} = Config.resolve()
   end
 
   test "resolve/0 reads the override from the $callers chain" do
-    Mediate.Test.with_config(adapter: {Fake, verdict: :allow})
+    Mediate.Test.with_config(engine: {Fake, effect: :allow})
 
-    assert {:ok, %Config{adapter: {Fake, verdict: :allow}}} =
+    assert {:ok, %Config{engine: {Fake, effect: :allow}}} =
              Task.await(Task.async(fn -> Task.await(Task.async(&Config.resolve/0)) end))
 
     assert {:error, %Error{reason: :invalid}} =
@@ -101,13 +101,13 @@ defmodule Mediate.ConfigTest do
   end
 
   test "with_config/2 restores the previous override even when the function raises" do
-    Mediate.Test.with_config(adapter: Fake)
+    Mediate.Test.with_config(engine: Fake)
 
     assert_raise RuntimeError, fn ->
-      Mediate.Test.with_config([caps: [policy_content_bytes: 8]], fn -> raise "boom" end)
+      Mediate.Test.with_config([caps: [policy_text_bytes: 8]], fn -> raise "boom" end)
     end
 
-    assert {:ok, %Config{caps: [policy_content_bytes: 65_536]}} = Config.resolve()
+    assert {:ok, %Config{caps: [policy_text_bytes: 65_536]}} = Config.resolve()
   end
 
   test "override_key/0 names the process dictionary key" do

@@ -2,7 +2,7 @@ defmodule Mediate.Cerbos.BindingTest do
   use ExUnit.Case, async: false
 
   alias Mediate.Cerbos.Binding
-  alias Mediate.Cerbos.Conformance.Attributes
+  alias Mediate.Cerbos.Conformance.Reference
   alias Mediate.Error
   alias Mediate.Fixture.Folder
   alias Mediate.TestRepos.Sandboxed
@@ -23,14 +23,14 @@ defmodule Mediate.Cerbos.BindingTest do
 
   defmodule Composite do
     @moduledoc false
-    use Mediate.Cerbos.Attributes
+    use Mediate.Cerbos.Declarations
 
     resource :pair, schema: Pair do
       attribute :left, column: :left
     end
   end
 
-  @options [repo: Sandboxed, attributes: Attributes, policies: "priv/conformance", commit: "conformance"]
+  @options [repo: Sandboxed, declarations: Reference, policy_dir: "priv/conformance", commit: "conformance"]
 
   setup do
     :persistent_term.erase(Binding)
@@ -38,19 +38,19 @@ defmodule Mediate.Cerbos.BindingTest do
     on_exit(fn -> :persistent_term.erase(Binding) end)
   end
 
-  test "the binding is the repo, the declarations, the directory, and the commit" do
+  test "the binding is the repo, the declarations, the policy directory, and the commit" do
     assert {:ok, %Binding{} = binding} = Binding.new(@options)
     assert binding.repo == Sandboxed
-    assert binding.attributes == Attributes
-    assert binding.policies == "priv/conformance"
+    assert binding.declarations == Reference
+    assert binding.policy_dir == "priv/conformance"
     assert binding.commit == "conformance"
     assert binding.author == nil
     assert binding.approval == nil
 
     assert Binding.to_keyword(binding) == [
              repo: Sandboxed,
-             attributes: Attributes,
-             policies: "priv/conformance",
+             declarations: Reference,
+             policy_dir: "priv/conformance",
              commit: "conformance",
              author: nil,
              approval: nil
@@ -58,18 +58,29 @@ defmodule Mediate.Cerbos.BindingTest do
   end
 
   test "options the schema does not accept are an invalid binding" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid binding: " <> _rest} = error} =
+    assert {:error, %Error{reason: :invalid, message: "invalid binding: " <> _rest} = error} =
              Binding.new(Keyword.delete(@options, :commit))
 
-    assert error.detail =~ "required :commit option not found"
+    assert error.message =~ "required :commit option not found"
     assert Binding.options_schema().schema[:repo][:required]
   end
 
-  test "a module that did not declare attributes is an invalid binding" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid binding: " <> detail}} =
-             Binding.new(put_in(@options[:attributes], Folder))
+  test "a module that did not use the declarations is an invalid binding" do
+    assert {:error, %Error{reason: :invalid, message: "invalid binding: " <> message}} =
+             Binding.new(put_in(@options[:declarations], Folder))
 
-    assert detail == "#{inspect(Folder)} did not use Mediate.Cerbos.Attributes"
+    assert message ==
+             "Mediate.Fixture.Folder did not use Mediate.Cerbos.Declarations; " <>
+               "add use Mediate.Cerbos.Declarations or bind the module that does"
+  end
+
+  test "a block whose schema has no single primary key is an invalid binding" do
+    assert {:error, %Error{reason: :invalid, message: "invalid binding: " <> message}} =
+             Binding.new(put_in(@options[:declarations], Composite))
+
+    assert message ==
+             "Mediate.Cerbos.BindingTest.Composite declares resource :pair on Mediate.Cerbos.BindingTest.Pair, " <>
+               "whose primary key is not one column; Mediate.Cerbos names a row by one key column"
   end
 
   test "what is bound at boot is what resolve answers, under the calling process's override" do
@@ -100,15 +111,20 @@ defmodule Mediate.Cerbos.BindingTest do
 
   test "nothing bound and no override is an invalid binding" do
     assert Binding.resolve() ==
-             {:error, %Error{reason: :invalid, detail: "invalid binding: nothing bound and no override"}}
+             {:error,
+              %Error{
+                reason: :invalid,
+                message: "invalid binding: nothing bound and no override; call Mediate.Cerbos.Binding.bind!/1 at boot"
+              }}
   end
 
-  test "the target of a kind is its schema and its one primary key" do
+  test "the schema and the key of a block, and nil for a block no declaration names" do
     {:ok, binding} = Binding.new(@options)
 
-    assert Binding.target(binding, :folder) == {Folder, :id}
-    assert Binding.target(binding, :nothing) == nil
-    assert Binding.target(%{binding | attributes: Composite}, :pair) == nil
+    assert Binding.schema_and_key(binding, {:resource, :folder}) == {Folder, :id}
+    assert Binding.schema_and_key(binding, {:principal, :user}) == {Mediate.Fixture.Account, :id}
+    assert Binding.schema_and_key(binding, {:resource, :user}) == nil
+    assert Binding.schema_and_key(binding, {:resource, :nothing}) == nil
   end
 
   test "a binding that cannot be validated cannot be bound" do

@@ -1,13 +1,14 @@
 defmodule Mediate.Postgres.Conformance do
   @moduledoc """
   The conformance artifact of row-level security: the migration that
-  protects the neutral fixture's tables and writes its rule as policies.
-  `Mediate.Conformance.World` says what the fixture is. The test run
-  compiles it. An application never loads it.
+  protects the reference world's tables and writes its rule as policies,
+  and the policy artifact that tightens one of them.
+  `Mediate.Conformance.Reference.World` says what the world is. The test
+  run compiles them. A deployment never loads them.
   """
 
   use Boundary,
     top_level?: true,
-    deps: [Mediate.Postgres, Mediate.Conformance, Mediate.TestRepos, Ecto],
-    exports: [Rules, Versions]
+    deps: [Mediate, Mediate.Postgres, Mediate.Conformance, Mediate.TestRepos, Ecto],
+    exports: [Policy, Reference]
 end

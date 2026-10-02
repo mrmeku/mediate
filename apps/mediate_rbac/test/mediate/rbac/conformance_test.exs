@@ -1,21 +1,21 @@
 defmodule Mediate.Rbac.ConformanceTest do
-  use Mediate.Conformance.AdapterCase,
+  use Mediate.Conformance.EngineCase,
     async: false,
-    adapter: Mediate.Rbac,
+    engine: Mediate.Rbac,
     repo: Mediate.TestRepos.Sandboxed,
-    world: Mediate.Conformance.Fixture.World,
-    sandbox: Mediate.Dev.Sandbox,
-    committed: [
-      repo: Mediate.TestRepos.Committed,
+    world: Mediate.Conformance.Reference.World,
+    setup: Mediate.Dev.Sandbox,
+    policy: Mediate.Rbac.Conformance.Policy,
+    durable: [
+      repo: Mediate.TestRepos.Durable,
       owner: Mediate.TestRepos.Owner,
       tables: ~w(mediate_fixture_memberships mediate_fixture_items mediate_fixture_folders mediate_fixture_accounts)
-    ],
-    versions: Mediate.Rbac.Conformance.Versions
+    ]
 
   alias Mediate.Rbac.Binding
-  alias Mediate.Rbac.Conformance.Roles
+  alias Mediate.Rbac.Conformance.Reference
 
   setup %{repo: repo} do
-    :ok = Binding.override(policy: Roles, repo: repo)
+    :ok = Binding.override(policy: Reference, repo: repo)
   end
 end

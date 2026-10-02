@@ -1,13 +1,14 @@
 defmodule Mediate.Config do
   @moduledoc """
   The only runtime configuration the library reads. `boot!/1` validates it
-  once at boot from a `NimbleOptions` schema and stores it. The adapter is
+  once at boot from a `NimbleOptions` schema and stores it. The engine is
   a module or a `{module, keyword}` pair, and a bare module means `[]`,
-  which the adapter's `options_schema/0` still validates. The port and the
-  seam call `resolve/0`. It answers the boot struct under the overrides
-  `Mediate.Test.with_config/1` put in the process dictionary. It takes the
-  first non-empty override, from the caller and then from each process in
-  its `$callers` chain, and merges it over the boot struct field by field.
+  which the engine's `options_schema/0` still validates. The library and
+  the mediated repo call `resolve/0`. It answers the boot struct under the
+  overrides `Mediate.Test.with_config/1` put in the process dictionary. It
+  takes the first non-empty override, from the caller and then from each
+  process in its `$callers` chain, and merges it over the boot struct field
+  by field.
 
   Fields: #{NimbleOptions.docs(Mediate.Domain.ConfigSchema.schema())}
   """
@@ -15,25 +16,25 @@ defmodule Mediate.Config do
   alias Mediate.Domain.ConfigSchema
   alias Mediate.Error
 
-  @enforce_keys [:adapter, :clock, :caps]
+  @enforce_keys [:engine, :clock, :caps]
   defstruct @enforce_keys
 
-  @typedoc "The adapter module, with its own options beside it when it takes any."
-  @type adapter :: module() | {module(), keyword()}
-  @typedoc "What the port calls for `now`. A test gives one that does not move."
+  @typedoc "The engine module, with its own options beside it when it takes any."
+  @type engine :: module() | {module(), keyword()}
+  @typedoc "What the library calls for `now`. A test gives one that does not move."
   @type clock :: (-> DateTime.t())
-  @typedoc "The size above which a policy version carries a pointer rather than the text."
-  @type caps :: [policy_content_bytes: pos_integer()]
+  @typedoc "The size above which a policy release carries a location rather than the text."
+  @type caps :: [policy_text_bytes: pos_integer()]
 
   @typedoc "The validated configuration, read once at boot."
-  @type t :: %__MODULE__{adapter: adapter(), clock: clock(), caps: caps()}
+  @type t :: %__MODULE__{engine: engine(), clock: clock(), caps: caps()}
 
   @doc "Validate a keyword list into the struct."
   @spec new(keyword()) :: {:ok, t()} | {:error, Error.t()}
   def new(options) when is_list(options) do
     with {:ok, validated} <- validate(options),
-         {:ok, adapter} <- validate_adapter(validated[:adapter]) do
-      {:ok, %__MODULE__{adapter: adapter, clock: validated[:clock], caps: validated[:caps]}}
+         {:ok, engine} <- validate_engine(validated[:engine]) do
+      {:ok, %__MODULE__{engine: engine, clock: validated[:clock], caps: validated[:caps]}}
     end
   end
 
@@ -69,13 +70,13 @@ defmodule Mediate.Config do
   @doc "The struct as the keyword list `new/1` accepts."
   @spec to_keyword(t()) :: keyword()
   def to_keyword(%__MODULE__{} = config) do
-    [adapter: config.adapter, clock: config.clock, caps: config.caps]
+    [engine: config.engine, clock: config.clock, caps: config.caps]
   end
 
-  @doc "The adapter module and its options."
-  @spec adapter(t()) :: {module(), keyword()}
-  def adapter(%__MODULE__{adapter: {module, options}}), do: {module, options}
-  def adapter(%__MODULE__{adapter: module}) when is_atom(module), do: {module, []}
+  @doc "The engine module and its options."
+  @spec engine(t()) :: {module(), keyword()}
+  def engine(%__MODULE__{engine: {module, options}}), do: {module, options}
+  def engine(%__MODULE__{engine: module}) when is_atom(module), do: {module, []}
 
   @doc false
   @spec override_key() :: atom()
@@ -88,14 +89,14 @@ defmodule Mediate.Config do
     end
   end
 
-  defp validate_adapter({module, options}) when is_atom(module) and is_list(options) do
-    with :ok <- implements(module, Mediate.Adapter, :adapter),
-         {:ok, options} <- validate_options(module, options, :adapter) do
+  defp validate_engine({module, options}) when is_atom(module) and is_list(options) do
+    with :ok <- implements(module, Mediate.Engine, :engine),
+         {:ok, options} <- validate_options(module, options, :engine) do
       {:ok, {module, options}}
     end
   end
 
-  defp validate_adapter(module) when is_atom(module), do: validate_adapter({module, []})
+  defp validate_engine(module) when is_atom(module), do: validate_engine({module, []})
 
   defp implements(module, behaviour, what) do
     behaviours =
@@ -131,7 +132,7 @@ defmodule Mediate.Config do
     end
   end
 
-  defp invalid(what, detail), do: Error.invalid(what, detail)
+  defp invalid(what, text), do: Error.invalid(what, text)
 
   # This reads the override from the current process, then from each
   # process in its `$callers` chain, nearest first. The first one found

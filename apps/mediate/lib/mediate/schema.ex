@@ -1,152 +1,152 @@
 defmodule Mediate.Schema.Fact do
   @moduledoc """
-  One declared fact column. It holds the kind, the column that names the
-  subject, the column that names the object, and the element type of a
-  set-valued column. `Mediate.Schema.fact/2` records it, and the seam reads
-  it.
+  One declared fact column. It holds whose fact it is, the column that
+  names the subject, the column that names the resource, and the element
+  type of a set-valued column. `Mediate.Schema.fact/2` records it, and the
+  mediated repo reads it.
   """
 
-  @enforce_keys [:column, :kind, :subject, :object, :element]
+  @enforce_keys [:column, :about, :subject, :resource, :element]
   defstruct @enforce_keys
 
-  @typedoc "What the column says: an attribute of the subject, an attribute of the object, or a grant."
-  @type kind :: :subject_attribute | :object_attribute | :relationship
+  @typedoc "Whose fact the column is: the subject's, the resource's, or the grant's."
+  @type about :: :subject | :resource | :grant
 
   @typedoc "One fact declaration, as `Mediate.Schema.fact/2` records it."
   @type t :: %__MODULE__{
           column: atom(),
-          kind: kind(),
+          about: about(),
           subject: atom() | nil,
-          object: atom() | nil,
+          resource: atom() | nil,
           element: atom() | nil
         }
 end
 
-defmodule Mediate.Schema.Relationship do
+defmodule Mediate.Schema.Grant do
   @moduledoc """
-  A row that is a grant: the subject column, the object column, and the
-  columns that are attributes of the relationship.
-  `Mediate.Schema.relationship/1` records it.
+  A row that is a grant: the subject column, the resource column, and the
+  columns that are attributes of the grant. `Mediate.Schema.grant/1`
+  records it.
   """
 
-  @enforce_keys [:subject, :object, :attributes]
+  @enforce_keys [:subject, :resource, :attributes]
   defstruct @enforce_keys
 
-  @typedoc "One relationship declaration, as `Mediate.Schema.relationship/1` records it."
-  @type t :: %__MODULE__{subject: atom(), object: atom(), attributes: [atom()]}
+  @typedoc "One grant declaration, as `Mediate.Schema.grant/1` records it."
+  @type t :: %__MODULE__{subject: atom(), resource: atom(), attributes: [atom()]}
 end
 
 defmodule Mediate.Schema do
   @moduledoc """
   Declarations on an Ecto schema. They say:
 
-  - the object type it protects
+  - the resource type it protects
   - the associations its decision covers
-  - what kind of thing its rows are
+  - that its rows are identities, and of which kind
   - the fact mapping, column by column
 
-  Each macro records its declaration and does nothing else. The seam reads
-  them back through `__mediate__/1`.
+  Each macro records its declaration and does nothing else. The mediated
+  repo reads them back through `__mediate__/1`.
 
       defmodule Example.Domain.Visibility do
         use Ecto.Schema
         use Mediate.Schema
 
-        object_type(:visibility)
-        audited(:entity)
-        fact(:labels, kind: :object_attribute, object: :repository_id, element: :label)
-        fact(:restrictions, kind: :object_attribute, object: :repository_id, element: :restriction)
-        fact(:releasable_to, kind: :object_attribute, object: :repository_id, element: :country)
-        fact(:invited, kind: :relationship, object: :repository_id, element: :user)
+        resource_type(:visibility)
+        identity(:other)
+        fact(:labels, about: :resource, resource: :repository_id, element: :label)
+        fact(:restrictions, about: :resource, resource: :repository_id, element: :restriction)
+        fact(:releasable_to, about: :resource, resource: :repository_id, element: :country)
+        fact(:invited, about: :grant, resource: :repository_id, element: :account)
       end
 
-  A schema that declares an object type is protected: the seam refuses to
-  read or write it without a decision. A schema that declares
-  `carries/1` names the associations the root's decision covers. A grant
-  row declares `relationship/1` with its subject and object columns.
+  A schema that declares a resource type is protected: the mediated repo
+  refuses to read or write it without a decision. A schema that declares
+  `covers/1` names the associations the root's decision covers. A grant
+  row declares `grant/1` with its subject and resource columns.
 
   `__mediate__/1` answers each declaration:
 
-  - `:object_type`, the declared type or `nil`
-  - `:carries`, the carried association names
-  - `:kind`, the kind `audited/1` declared or `nil`
+  - `:resource_type`, the declared type or `nil`
+  - `:covers`, the covered association names
+  - `:identity`, the kind `identity/1` declared or `nil`
   - `:facts`, the `Mediate.Schema.Fact` records in declaration order
-  - `:relationship`, the `Mediate.Schema.Relationship` or `nil`
+  - `:grant`, the `Mediate.Schema.Grant` or `nil`
 
   This file defines every structure it needs, so a schema's compile-time
   dependency on it reaches nothing else.
   """
 
   alias Mediate.Schema.Fact
-  alias Mediate.Schema.Relationship
+  alias Mediate.Schema.Grant
 
-  @kinds [:user, :group, :role, :entity]
+  @identities [:account, :group, :role, :other]
 
   @fact_schema NimbleOptions.new!(
-                 kind: [type: {:in, [:subject_attribute, :object_attribute, :relationship]}, required: true],
+                 about: [type: {:in, [:subject, :resource, :grant]}, required: true],
                  subject: [
                    type: :atom,
                    doc: "The column that names the subject. A set-valued column's subject is its element."
                  ],
-                 object: [type: :atom, doc: "The column that names the object."],
+                 resource: [type: :atom, doc: "The column that names the resource."],
                  element: [
                    type: :atom,
                    doc: "The element type of a set-valued column, which is the type each element refers to."
                  ]
                )
 
-  @relationship_schema NimbleOptions.new!(
-                         subject: [type: :atom, required: true],
-                         object: [type: :atom, required: true],
-                         attributes: [type: {:list, :atom}, default: []]
-                       )
+  @grant_schema NimbleOptions.new!(
+                  subject: [type: :atom, required: true],
+                  resource: [type: :atom, required: true],
+                  attributes: [type: {:list, :atom}, default: []]
+                )
 
   @doc false
   defmacro __using__(_opts) do
     quote do
-      import Mediate.Schema, only: [object_type: 1, carries: 1, audited: 1, fact: 2, relationship: 1]
+      import Mediate.Schema, only: [resource_type: 1, covers: 1, identity: 1, fact: 2, grant: 1]
 
       Module.register_attribute(__MODULE__, :mediate_facts, accumulate: true)
-      Module.put_attribute(__MODULE__, :mediate_object_type, nil)
-      Module.put_attribute(__MODULE__, :mediate_carries, [])
-      Module.put_attribute(__MODULE__, :mediate_kind, nil)
-      Module.put_attribute(__MODULE__, :mediate_relationship, nil)
+      Module.put_attribute(__MODULE__, :mediate_resource_type, nil)
+      Module.put_attribute(__MODULE__, :mediate_covers, [])
+      Module.put_attribute(__MODULE__, :mediate_identity, nil)
+      Module.put_attribute(__MODULE__, :mediate_grant, nil)
       @before_compile Mediate.Schema
     end
   end
 
-  @doc "Declare the object type this schema's rows are, so a query over it needs a decision."
-  defmacro object_type(type) do
+  @doc "Declare the resource type this schema's rows are, so a query over it needs a decision."
+  defmacro resource_type(type) do
     quote bind_quoted: [type: type] do
-      Mediate.Schema.__declare_object_type__(__MODULE__, type)
+      Mediate.Schema.__declare_resource_type__(__MODULE__, type)
     end
   end
 
   @doc "Declare the associations the parent's decision covers."
-  defmacro carries(associations) do
+  defmacro covers(associations) do
     quote bind_quoted: [associations: associations] do
-      Mediate.Schema.__declare_carries__(__MODULE__, associations)
+      Mediate.Schema.__declare_covers__(__MODULE__, associations)
     end
   end
 
-  @doc "Declare what kind of thing a row of this schema is, which is what makes its writes audited. An audited schema need not declare an object type, and then the seam records its writes and passes them without a decision."
-  defmacro audited(kind) do
+  @doc "Declare that a row of this schema is an identity, and of which kind. That is what makes the mediated repo publish its writes. An identity schema need not declare a resource type, and then the repo records its writes and passes them without a decision."
+  defmacro identity(kind) do
     quote bind_quoted: [kind: kind] do
-      Mediate.Schema.__declare_kind__(__MODULE__, kind)
+      Mediate.Schema.__declare_identity__(__MODULE__, kind)
     end
   end
 
-  @doc "Declare one fact column and how it maps to a fact kind."
+  @doc "Declare one fact column and whose fact it is."
   defmacro fact(column, options) do
     quote bind_quoted: [column: column, options: options] do
       Mediate.Schema.__declare_fact__(__MODULE__, column, options)
     end
   end
 
-  @doc "Declare that a row of this schema is a relationship grant."
-  defmacro relationship(options) do
+  @doc "Declare that a row of this schema is a grant."
+  defmacro grant(options) do
     quote bind_quoted: [options: options] do
-      Mediate.Schema.__declare_relationship__(__MODULE__, options)
+      Mediate.Schema.__declare_grant__(__MODULE__, options)
     end
   end
 
@@ -156,31 +156,31 @@ defmodule Mediate.Schema do
 
     quote do
       @doc false
-      @spec __mediate__(:object_type | :carries | :kind | :facts | :relationship) :: term()
-      def __mediate__(:object_type), do: @mediate_object_type
-      def __mediate__(:carries), do: @mediate_carries
-      def __mediate__(:kind), do: @mediate_kind
+      @spec __mediate__(:resource_type | :covers | :identity | :facts | :grant) :: term()
+      def __mediate__(:resource_type), do: @mediate_resource_type
+      def __mediate__(:covers), do: @mediate_covers
+      def __mediate__(:identity), do: @mediate_identity
       def __mediate__(:facts), do: unquote(Macro.escape(facts))
-      def __mediate__(:relationship), do: @mediate_relationship
+      def __mediate__(:grant), do: @mediate_grant
     end
   end
 
-  @doc "The object type a module declares, or `nil` for a module that declares none or is not a schema."
-  @spec object_type_of(term()) :: atom() | nil
-  def object_type_of(module) do
-    if declares?(module), do: module.__mediate__(:object_type)
+  @doc "The resource type a module declares, or `nil` for a module that declares none or is not a schema."
+  @spec resource_type_of(term()) :: atom() | nil
+  def resource_type_of(module) do
+    if declares?(module), do: module.__mediate__(:resource_type)
   end
 
   @doc "The associations a module's decision covers, or `[]` where it declares none."
-  @spec carries_of(term()) :: [atom()]
-  def carries_of(module) do
-    if declares?(module), do: module.__mediate__(:carries), else: []
+  @spec covers_of(term()) :: [atom()]
+  def covers_of(module) do
+    if declares?(module), do: module.__mediate__(:covers), else: []
   end
 
-  @doc "What kind of thing a module's rows are, or `nil` for a module that declares none."
-  @spec kind_of(term()) :: atom() | nil
-  def kind_of(module) do
-    if declares?(module), do: module.__mediate__(:kind)
+  @doc "The identity kind a module declares, or `nil` for a module that declares none."
+  @spec identity_of(term()) :: atom() | nil
+  def identity_of(module) do
+    if declares?(module), do: module.__mediate__(:identity)
   end
 
   @doc "A row's primary key: the value of its one key column, or a map of the columns where it has several."
@@ -192,9 +192,9 @@ defmodule Mediate.Schema do
     end
   end
 
-  @doc "Whether the seam audits a module's writes, which is whether it declares what kind of thing its rows are."
-  @spec audited?(term()) :: boolean()
-  def audited?(module), do: kind_of(module) != nil
+  @doc "Whether a module's rows are identities, which is whether the mediated repo publishes its writes."
+  @spec identity?(term()) :: boolean()
+  def identity?(module), do: identity_of(module) != nil
 
   @doc "The fact columns a module declares, in declaration order, or `[]` where it declares none."
   @spec facts_of(term()) :: [Fact.t()]
@@ -204,24 +204,24 @@ defmodule Mediate.Schema do
 
   @doc """
   The columns a module declares as facts: its fact columns and the columns
-  of its relationship, each once, in declaration order.
+  of its grant, each once, in declaration order.
   """
   @spec fact_columns(term()) :: [atom()]
   def fact_columns(module) do
-    columns = Enum.map(facts_of(module), & &1.column) ++ relationship_columns(relationship_of(module))
+    columns = Enum.map(facts_of(module), & &1.column) ++ grant_columns(grant_of(module))
 
     Enum.uniq(columns)
   end
 
-  @doc "The relationship a module's rows are, or `nil`."
-  @spec relationship_of(term()) :: Relationship.t() | nil
-  def relationship_of(module) do
-    if declares?(module), do: module.__mediate__(:relationship)
+  @doc "The grant a module's rows are, or `nil`."
+  @spec grant_of(term()) :: Grant.t() | nil
+  def grant_of(module) do
+    if declares?(module), do: module.__mediate__(:grant)
   end
 
-  @doc "Whether a module carries fact declarations: a fact column or a relationship."
+  @doc "Whether a module carries fact declarations: a fact column or a grant."
   @spec fact_schema?(term()) :: boolean()
-  def fact_schema?(module), do: facts_of(module) != [] or relationship_of(module) != nil
+  def fact_schema?(module), do: facts_of(module) != [] or grant_of(module) != nil
 
   @doc "Whether a module used `Mediate.Schema`."
   @spec declares?(term()) :: boolean()
@@ -232,39 +232,39 @@ defmodule Mediate.Schema do
   def declares?(_other), do: false
 
   @doc false
-  @spec __declare_object_type__(module(), atom()) :: :ok
-  def __declare_object_type__(module, type) when is_atom(module) and is_atom(type) and not is_nil(type) do
-    case Module.get_attribute(module, :mediate_object_type) do
-      nil -> Module.put_attribute(module, :mediate_object_type, type)
-      other -> raise ArgumentError, "#{inspect(module)} already declares object_type #{inspect(other)}"
+  @spec __declare_resource_type__(module(), atom()) :: :ok
+  def __declare_resource_type__(module, type) when is_atom(module) and is_atom(type) and not is_nil(type) do
+    case Module.get_attribute(module, :mediate_resource_type) do
+      nil -> Module.put_attribute(module, :mediate_resource_type, type)
+      other -> raise ArgumentError, "#{inspect(module)} already declares resource_type #{inspect(other)}"
     end
   end
 
   @doc false
-  @spec __declare_carries__(module(), [atom()]) :: :ok
-  def __declare_carries__(module, associations) when is_atom(module) and is_list(associations) do
+  @spec __declare_covers__(module(), [atom()]) :: :ok
+  def __declare_covers__(module, associations) when is_atom(module) and is_list(associations) do
     if !Enum.all?(associations, &is_atom/1) do
-      raise ArgumentError, "carries expects a list of association names, got: #{inspect(associations)}"
+      raise ArgumentError, "covers expects a list of association names, got: #{inspect(associations)}"
     end
 
-    declared = Module.get_attribute(module, :mediate_carries)
+    declared = Module.get_attribute(module, :mediate_covers)
 
     case Enum.filter(associations, &(&1 in declared)) do
-      [] -> Module.put_attribute(module, :mediate_carries, declared ++ associations)
-      repeated -> raise ArgumentError, "#{inspect(module)} already carries #{inspect(repeated)}"
+      [] -> Module.put_attribute(module, :mediate_covers, declared ++ associations)
+      repeated -> raise ArgumentError, "#{inspect(module)} already covers #{inspect(repeated)}"
     end
   end
 
   @doc false
-  @spec __declare_kind__(module(), atom()) :: :ok
-  def __declare_kind__(module, kind) when is_atom(module) do
-    if kind not in @kinds do
-      raise ArgumentError, "audited expects one of #{inspect(@kinds)}, got: #{inspect(kind)}"
+  @spec __declare_identity__(module(), atom()) :: :ok
+  def __declare_identity__(module, kind) when is_atom(module) do
+    if kind not in @identities do
+      raise ArgumentError, "identity expects one of #{inspect(@identities)}, got: #{inspect(kind)}"
     end
 
-    case Module.get_attribute(module, :mediate_kind) do
-      nil -> Module.put_attribute(module, :mediate_kind, kind)
-      other -> raise ArgumentError, "#{inspect(module)} is already audited as #{inspect(other)}"
+    case Module.get_attribute(module, :mediate_identity) do
+      nil -> Module.put_attribute(module, :mediate_identity, kind)
+      other -> raise ArgumentError, "#{inspect(module)} already declares identity #{inspect(other)}"
     end
   end
 
@@ -275,9 +275,9 @@ defmodule Mediate.Schema do
 
     fact = %Fact{
       column: column,
-      kind: options[:kind],
+      about: options[:about],
       subject: options[:subject],
-      object: options[:object],
+      resource: options[:resource],
       element: options[:element]
     }
 
@@ -285,27 +285,22 @@ defmodule Mediate.Schema do
   end
 
   @doc false
-  @spec __declare_relationship__(module(), keyword()) :: :ok
-  def __declare_relationship__(module, options) when is_atom(module) and is_list(options) do
-    options = NimbleOptions.validate!(options, @relationship_schema)
+  @spec __declare_grant__(module(), keyword()) :: :ok
+  def __declare_grant__(module, options) when is_atom(module) and is_list(options) do
+    options = NimbleOptions.validate!(options, @grant_schema)
 
-    case Module.get_attribute(module, :mediate_relationship) do
+    case Module.get_attribute(module, :mediate_grant) do
       nil ->
-        relationship = %Relationship{
-          subject: options[:subject],
-          object: options[:object],
-          attributes: options[:attributes]
-        }
+        grant = %Grant{subject: options[:subject], resource: options[:resource], attributes: options[:attributes]}
+        Module.put_attribute(module, :mediate_grant, grant)
 
-        Module.put_attribute(module, :mediate_relationship, relationship)
-
-      %Relationship{} ->
-        raise ArgumentError, "#{inspect(module)} already declares a relationship"
+      %Grant{} ->
+        raise ArgumentError, "#{inspect(module)} already declares a grant"
     end
   end
 
-  defp relationship_columns(nil), do: []
+  defp grant_columns(nil), do: []
 
-  defp relationship_columns(%Relationship{subject: subject, object: object, attributes: attributes}),
-    do: [subject, object | attributes]
+  defp grant_columns(%Grant{subject: subject, resource: resource, attributes: attributes}),
+    do: [subject, resource | attributes]
 end

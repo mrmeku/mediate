@@ -2,14 +2,15 @@ defmodule Mediate.Postgres.MigrationTest do
   use ExUnit.Case, async: false
 
   alias Mediate.Error
-  alias Mediate.PolicyVersion
+  alias Mediate.PolicyRelease
   alias Mediate.Postgres.Binding
   alias Mediate.Postgres.Catalog
   alias Mediate.Postgres.Migration
   alias Mediate.Postgres.Probe
+  alias Mediate.Postgres.Version
   alias Mediate.TestRepos.Owner
 
-  @moduletag :committed
+  @moduletag :durable
 
   @probe "mediate_probe_rows"
   @table "mediate_migration_test_rows"
@@ -26,121 +27,131 @@ defmodule Mediate.Postgres.MigrationTest do
     assert security() == [true, true]
   end
 
-  test "policy! guards the operation, so the policy of one operation cannot widen another" do
-    assert Migration.policy!(Owner, table: @table, operation: :read, using: @using) == :ok
-    assert Migration.policy!(Owner, table: @table, operation: :edit, using: @using) == :ok
+  test "filter! guards the action, so the rule of one action cannot widen another" do
+    assert Migration.filter!(Owner, table: @table, action: :read, using: @using) == :ok
+    assert Migration.filter!(Owner, table: @table, action: :edit, using: @using) == :ok
 
-    assert [edit, read] = policies()
-    assert {read.name, read.command} == {"mediate_scope_read", :select}
-    assert read.using =~ "current_setting('mediate.operation'::text, true) = 'read'::text"
+    assert [edit, read] = rules()
+    assert {read.name, read.command} == {"mediate_filter_read", :select}
+    assert read.using =~ "current_setting('mediate.action'::text, true) = 'read'::text"
     assert read.using =~ "label"
     assert read.with_check == nil
-    assert {edit.name, edit.command} == {"mediate_scope_edit", :select}
+    assert {edit.name, edit.command} == {"mediate_filter_edit", :select}
     assert edit.using =~ "'edit'::text"
   end
 
-  test "a gate carries no operation guard, so the database refuses the write whether or not anything asked" do
-    assert Migration.gate!(Owner, table: @table, operation: :edit, using: @using, with_check: @using) == :ok
+  test "a gate carries no action guard, so the database refuses the write whether or not anything asked" do
+    assert Migration.gate!(Owner, table: @table, action: :edit, using: @using, with_check: @using) == :ok
 
-    assert [gate] = policies()
+    assert [gate] = rules()
     assert {gate.name, gate.command} == {"mediate_gate_edit", :update}
-    refute gate.using =~ "mediate.operation"
+    refute gate.using =~ "mediate.action"
     assert gate.with_check == gate.using
   end
 
-  test "an operation whose write is an insert has no row to read first, so its gate checks the new row alone" do
-    assert Migration.gate!(Owner, table: @table, operation: :add, command: :insert, with_check: @using) == :ok
+  test "an action whose write is an insert has no row to read first, so its gate checks the new row alone" do
+    assert Migration.gate!(Owner, table: @table, action: :add, command: :insert, with_check: @using) == :ok
 
-    assert [gate] = policies()
+    assert [gate] = rules()
     assert {gate.name, gate.command} == {"mediate_gate_add", :insert}
     assert gate.using == nil
     assert gate.with_check =~ "label"
   end
 
-  test "admit! adds the permissive true policy a command needs under forced row-level security" do
+  test "admit! adds the permissive true rule a command needs under forced row-level security" do
     Enum.each([:insert, :delete, :select, :update], &(:ok = Migration.admit!(Owner, table: @table, command: &1)))
 
-    assert [delete, insert, select, update] = policies()
+    assert [delete, insert, select, update] = rules()
     assert {delete.name, delete.command, delete.using} == {"mediate_admit_delete", :delete, "true"}
     assert {insert.name, insert.command, insert.with_check} == {"mediate_admit_insert", :insert, "true"}
     assert {select.name, select.command, select.using} == {"mediate_admit_select", :select, "true"}
     assert {update.command, update.using, update.with_check} == {:update, "true", "true"}
   end
 
-  test "exempt! admits the role's statements while no operation is in force" do
+  test "exempt! admits the role's statements while no action is in force" do
     assert Migration.exempt!(Owner, table: @table, to: "mediate_app") == :ok
 
-    assert [delete, insert, select, update] = policies()
+    assert [delete, insert, select, update] = rules()
     assert {select.name, select.command} == {"mediate_exempt_mediate_app_select", :select}
     assert Enum.all?([delete, insert, select, update], &(expression(&1) =~ "mediate_app"))
-    assert Enum.all?([delete, insert, select, update], &(expression(&1) =~ "mediate.operation"))
+    assert Enum.all?([delete, insert, select, update], &(expression(&1) =~ "mediate.action"))
     assert {insert.name, insert.using} == {"mediate_exempt_mediate_app_insert", nil}
     assert {delete.name, delete.with_check} == {"mediate_exempt_mediate_app_delete", nil}
     assert update.with_check == update.using
   end
 
-  test "a role whose reads are unfiltered takes the policy without the operation clause" do
-    assert Migration.exempt!(Owner, table: @table, to: "mediate_owner", commands: [:select], outside_decision: false) ==
-             :ok
+  test "a role whose reads are unfiltered takes the rule that holds always" do
+    assert Migration.exempt!(Owner, table: @table, to: "mediate_owner", commands: [:select], always: true) == :ok
 
-    assert [policy] = policies()
-    assert policy.name == "mediate_exempt_mediate_owner_select"
-    assert policy.using =~ "mediate_owner"
-    refute policy.using =~ "mediate.operation"
+    assert [rule] = rules()
+    assert rule.name == "mediate_exempt_mediate_owner_select"
+    assert rule.using =~ "mediate_owner"
+    refute rule.using =~ "mediate.action"
   end
 
-  test "grant! is what lets the role reach the table at all" do
+  test "privileges! is what lets the role reach the table at all" do
     refute privilege("SELECT")
 
-    assert Migration.grant!(Owner, table: @table, to: "mediate_app", commands: [:select, :insert, :update, :delete]) ==
+    assert Migration.privileges!(Owner, table: @table, to: "mediate_app", commands: [:select, :insert, :update, :delete]) ==
              :ok
 
     assert Enum.all?(~w(SELECT INSERT UPDATE DELETE), &privilege/1)
   end
 
-  test "publish! reads the policies back and carries them as the version's content" do
-    :ok = Migration.policy!(Owner, table: @table, operation: :read, using: @using)
+  test "release! reads the rules back, carries them as the release's text, and publishes the core's event" do
+    :ok = Migration.filter!(Owner, table: @table, action: :read, using: @using)
+    :telemetry.attach(inspect(self()), PolicyRelease.event(), &__MODULE__.forward/4, self())
 
-    version =
-      Migration.publish!(Owner,
+    release =
+      Migration.release!(Owner,
         tables: [@table],
-        version: 20_260_909_000_001,
+        policy_version: 20_260_909_000_001,
         author: "mediate_postgres",
         approval: "the conformance suite"
       )
 
-    assert %PolicyVersion{adapter: Mediate.Postgres, version: "20260909000001"} = version
-    assert version.content == Catalog.to_text(policies())
-    assert version.content =~ "#{@table} mediate_scope_read select"
-    assert %DateTime{} = version.at
+    assert %PolicyRelease{engine: Mediate.Postgres, policy_version: "20260909000001"} = release
+    assert release.text == Version.text(rules())
+    assert release.text =~ "#{@table} mediate_filter_read select"
+    assert %DateTime{} = release.released_at
+    assert_receive {:policy_release, %{release: ^release}}
+  after
+    :telemetry.detach(inspect(self()))
   end
 
-  test "reload! reads the policies a migration wrote after the catalog was loaded" do
+  test "load reads the rules a migration wrote after the catalog was kept, and resolve answers the kept one" do
     binding = probe_binding()
-    loaded = Catalog.load!(binding)
-    refute Enum.any?(loaded.policies, &(&1.name == "mediate_scope_reloaded"))
+    kept = Catalog.load!(binding)
+    refute Enum.any?(kept.rules, &(&1.name == "mediate_filter_reloaded"))
 
-    on_exit(fn -> Owner.query!("DROP POLICY IF EXISTS mediate_scope_reloaded ON #{@probe}") end)
-    :ok = Migration.policy!(Owner, table: @probe, operation: :reloaded, using: "true")
+    on_exit(fn -> Owner.query!("DROP POLICY IF EXISTS mediate_filter_reloaded ON #{@probe}") end)
+    :ok = Migration.filter!(Owner, table: @probe, action: :reloaded, using: "true")
 
-    assert Catalog.load!(binding) == loaded
-    assert Enum.any?(Catalog.reload!(binding).policies, &(&1.name == "mediate_scope_reloaded"))
+    assert Catalog.resolve(binding) == {:ok, kept}
+    assert Enum.any?(Catalog.load!(binding).rules, &(&1.name == "mediate_filter_reloaded"))
 
-    Owner.query!("DROP POLICY mediate_scope_reloaded ON #{@probe}")
-    assert Catalog.reload!(binding) == loaded
+    Owner.query!("DROP POLICY mediate_filter_reloaded ON #{@probe}")
+    assert Catalog.load!(binding) == kept
   end
 
-  test "a name that is not a plain identifier never reaches a statement" do
-    assert %Error{reason: :invalid, detail: "invalid table: " <> _rest} =
+  test "a name that is not a lowercase identifier never reaches a statement" do
+    assert %Error{reason: :invalid, message: "invalid table: " <> _rest} =
              catch_error(Migration.protect!(Owner, "rows; DROP TABLE #{@table}"))
 
-    assert %Error{reason: :invalid, detail: "invalid role: " <> _rest} =
-             catch_error(Migration.grant!(Owner, table: @table, to: "a b", commands: []))
+    assert %Error{reason: :invalid, message: "invalid role: " <> _rest} =
+             catch_error(Migration.privileges!(Owner, table: @table, to: "a b", commands: []))
   end
 
-  defp policies, do: Catalog.policies!(Owner, [@table])
+  @doc false
+  @spec forward([atom()], map(), map(), pid()) :: :ok
+  def forward(_event, _measurements, metadata, pid) do
+    send(pid, {:policy_release, metadata})
+    :ok
+  end
 
-  defp expression(policy), do: policy.using || policy.with_check
+  defp rules, do: Catalog.rules(Owner, [@table])
+
+  defp expression(rule), do: rule.using || rule.with_check
 
   defp probe_binding do
     {:ok, binding} = Binding.new(repo: Owner, schemas: [Probe.Row])
@@ -149,9 +160,7 @@ defmodule Mediate.Postgres.MigrationTest do
 
   defp security do
     %{rows: [row]} =
-      Owner.query!("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = $1", [
-        @table
-      ])
+      Owner.query!("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = $1", [@table])
 
     row
   end

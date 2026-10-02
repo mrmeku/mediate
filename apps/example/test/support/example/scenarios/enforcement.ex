@@ -25,7 +25,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world)
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
   end
 
@@ -34,7 +34,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world)
 
-    settle()
+    sync()
     assert_denied(subject("frank"), repository)
   end
 
@@ -43,7 +43,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world)
 
-    settle()
+    sync()
     assert_read(subject("dana"), repository)
   end
 
@@ -52,7 +52,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:employees_only])
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
     assert_denied(subject("bob"), repository)
   end
@@ -62,7 +62,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:export_controlled])
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
     assert_denied(subject("carl"), repository)
   end
@@ -72,7 +72,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:releasable_to], releasable_to: ["FR", "GB"])
 
-    settle()
+    sync()
     assert_read(subject("carl"), repository)
     assert_denied(subject("ann"), repository)
   end
@@ -82,7 +82,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["ann"])
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
     assert_denied(subject("bob"), repository)
   end
@@ -92,7 +92,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:employees_only, :export_controlled])
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
     assert_denied(subject("carl"), repository)
     assert_denied(subject("bob"), repository)
@@ -104,12 +104,12 @@ defmodule Example.Scenarios.Enforcement do
     repository = Fixture.repository!(world, labels: ["secrets"])
     assert repository.visibility.restrictions == []
 
-    settle()
+    sync()
     assert_read(subject("ann"), repository)
     assert_denied(subject("bob"), repository)
     not_sensitive = Fixture.repository!(world, labels: ["docs"])
 
-    settle()
+    sync()
     assert_read(subject("bob"), not_sensitive)
   end
 
@@ -118,7 +118,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world)
 
-    settle()
+    sync()
     for id <- ["ann", "bob", "carl"], do: assert_read(subject(id), repository)
   end
 
@@ -136,7 +136,7 @@ defmodule Example.Scenarios.Enforcement do
 
     [open, export] = repository.directories
 
-    settle()
+    sync()
     assert_denied(subject("carl"), repository)
     assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("carl"), repository.id)
     assert Enum.map(directories, & &1.id) == [open.id]
@@ -154,10 +154,10 @@ defmodule Example.Scenarios.Enforcement do
 
     dropped = %{restrictions: []}
 
-    settle()
+    sync()
 
     assert {:error, %Repositories.RollupViolation{directories: %{restrictions: [:export_controlled]}}} =
-             Repositories.change_visibility(subject("dana"), repository.id, dropped, fresh())
+             Repositories.change_visibility(subject("dana"), repository.id, dropped, fresh_session())
 
     assert {:ok, %Repository{visibility: %{restrictions: [:export_controlled]}}} =
              Repositories.read(subject("dana"), repository.id)
@@ -165,7 +165,7 @@ defmodule Example.Scenarios.Enforcement do
     wider = %{restrictions: [:export_controlled, :employees_only]}
 
     assert {:ok, %Example.Domain.Visibility{restrictions: restrictions}} =
-             Repositories.change_visibility(subject("dana"), repository.id, wider, fresh())
+             Repositories.change_visibility(subject("dana"), repository.id, wider, fresh_session())
 
     assert Enum.sort(restrictions) == [:employees_only, :export_controlled]
   end
@@ -176,7 +176,7 @@ defmodule Example.Scenarios.Enforcement do
     past = DateTime.shift(DateTime.utc_now(), hour: -1)
     repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: past)
 
-    settle()
+    sync()
     assert_read(subject("bob"), repository)
   end
 
@@ -187,7 +187,7 @@ defmodule Example.Scenarios.Enforcement do
     repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: embargo)
     _at = Clock.set(DateTime.shift(embargo, second: -1))
 
-    settle()
+    sync()
     assert_denied(subject("bob"), repository)
     _at = Clock.set(DateTime.shift(embargo, second: 1))
     assert_read(subject("bob"), repository)
@@ -199,7 +199,7 @@ defmodule Example.Scenarios.Enforcement do
     past = DateTime.shift(DateTime.utc_now(), hour: -1)
     repository = Fixture.repository!(world, restrictions: [:employees_only], embargo: past)
 
-    settle()
+    sync()
     assert_denied(subject("frank"), repository)
   end
 
@@ -208,7 +208,7 @@ defmodule Example.Scenarios.Enforcement do
     world = Fixture.world!()
     repository = Fixture.repository!(world, restrictions: [:invite_only], invited: ["frank"])
 
-    settle()
+    sync()
     assert_denied(subject("frank"), repository)
   end
 
@@ -218,7 +218,7 @@ defmodule Example.Scenarios.Enforcement do
     acme = Fixture.repository!(world)
     globex = Fixture.repository!(world, project: world.other_project, team: world.other_team)
 
-    settle()
+    sync()
     assert invited(subject("ann")) == [acme.id]
     refute reads?(subject("ann"), globex)
     assert invited(subject("ivan")) == [globex.id]
@@ -239,7 +239,7 @@ defmodule Example.Scenarios.Enforcement do
 
     [worldwide, us_only] = repository.directories
 
-    settle()
+    sync()
     assert_denied(subject("carl"), repository)
     assert {:ok, %Repository{directories: directories}} = Repositories.checkout(subject("carl"), repository.id)
     assert Enum.map(directories, & &1.id) == [worldwide.id]

@@ -1,17 +1,17 @@
 defmodule Example.Domain.Rollup do
   @moduledoc """
-  Rule C4 at the domain's face: a row's visibility, the rollup over a set of
-  rows, and whether a rollup covers a visibility.
+  Clause C4 at the domain's face: a row's visibility, the rollup over a set
+  of rows, and whether a rollup includes a visibility.
 
   A repository's rollup is the visibility that admits no subject a directory of it
   denies. The labels and the restrictions are the union of the directories'.
   The REGIONS country list is the intersection of the lists of the directories
   that carry that restriction. So no rollup releases a country one directory
-  withholds. The repositories context keeps the rollup at write time and
+  withholds. The repositories application module keeps the rollup at write time and
   refuses a visibility change that drops a directory's restriction.
 
   The arithmetic reads visibilities as values and holds nothing, so a property
-  covers these laws and not examples. `Example.Domain.Restrictions` names the
+  proves these laws and not examples. `Example.Domain.Restrictions` names the
   vocabulary.
   """
 
@@ -49,15 +49,15 @@ defmodule Example.Domain.Rollup do
   end
 
   @doc """
-  Whether the rollup covers the visibility: every subject the rollup admits,
+  Whether the rollup includes the visibility: every subject the rollup admits,
   the visibility admits too.
 
   The rollup carries every label and every restriction of the visibility. Where
   the visibility carries `releasable_to`, the rollup releases to no country
   outside the visibility's list.
   """
-  @spec covers?(map(), map()) :: boolean()
-  def covers?(rollup, visibility) when is_map(rollup) and is_map(visibility) do
+  @spec includes?(map(), map()) :: boolean()
+  def includes?(rollup, visibility) when is_map(rollup) and is_map(visibility) do
     rollup = visibility(rollup)
     visibility = visibility(visibility)
 

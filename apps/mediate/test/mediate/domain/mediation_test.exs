@@ -10,13 +10,13 @@ defmodule Mediate.Domain.MediationTest do
   alias Mediate.Id
   alias Mediate.Test.Fake
 
-  test "a refusal names the caller where the seam could read one, and says nothing where it could not" do
-    parts = fn caller -> [function: :all, arity: 2, schema: Folder, object_type: nil, caller: caller] end
+  test "a refusal names the caller where the mediated repo could read one, and says nothing where it could not" do
+    parts = fn caller -> [function: :all, arity: 2, schema: Folder, resource_type: nil, caller: caller] end
 
-    assert %Error{reason: :unmediated, detail: named} = Mediation.unmediated(parts.(__MODULE__))
+    assert %Error{reason: :decision_missing, message: named} = Mediation.decision_missing(parts.(__MODULE__))
     assert named =~ "(from #{inspect(__MODULE__)})"
 
-    assert %Error{detail: bare} = Mediation.unmediated(parts.(:any))
+    assert %Error{message: bare} = Mediation.decision_missing(parts.(:any))
     assert bare == "Repo.all/2 on #{inspect(Folder)} carries no decision and no exemption"
   end
 
@@ -31,20 +31,20 @@ defmodule Mediate.Domain.MediationTest do
     assert Mediation.related(Folder, :missing) == nil
   end
 
-  test "a decision carries the root and every schema its carried associations reach, a denial raises, and an exemption records its caller" do
+  test "a decision covers the root and every schema its covered associations reach, a denial raises, and an exemption records its caller" do
     decision = decision(:folder, 1)
 
-    assert %Mediation{decision: ^decision, carried: [Folder, Item]} = Mediation.decided({:all, 2}, Folder, decision)
-    assert %Mediation{carried: [Item]} = Mediation.decided({:all, 2}, Item, decision(:item, 1))
-    assert %Mediation{carried: []} = Mediation.decided({:all, 2}, "mediate_fixture_folders", decision)
+    assert %Mediation{decision: ^decision, covered: [Folder, Item]} = Mediation.decided({:all, 2}, Folder, decision)
+    assert %Mediation{covered: [Item]} = Mediation.decided({:all, 2}, Item, decision(:item, 1))
+    assert %Mediation{covered: []} = Mediation.decided({:all, 2}, "mediate_fixture_folders", decision)
 
-    denial = %{decision | verdict: :deny, reason: :deny_by_default}
+    denial = %{decision | effect: :deny, reason: :no_rule_matched}
     assert_raise Error, fn -> Mediation.decided({:all, 2}, Folder, denial) end
 
-    assert %Mediation{exemption: %Exemption{kind: :library, caller: __MODULE__, reason: "library"}} =
+    assert %Mediation{exemption: %Exemption{declared_by: :library, caller: __MODULE__, justification: "library"}} =
              Mediation.library({:all, 2}, Folder, __MODULE__)
 
-    assert %Mediation{exemption: %Exemption{kind: :declared, caller: __MODULE__, reason: "a reason"}} =
+    assert %Mediation{exemption: %Exemption{declared_by: :caller, caller: __MODULE__, justification: "a reason"}} =
              Mediation.declared({:all, 2}, Folder, __MODULE__, "a reason")
   end
 
@@ -52,14 +52,14 @@ defmodule Mediate.Domain.MediationTest do
     %Decision{
       id: Id.new(),
       subject: {:user, "user-1"},
-      object: {type, id},
-      operation: :read,
-      verdict: :allow,
-      reason: :allowed,
-      adapter: Fake,
+      resource: {type, id},
+      action: :read,
+      effect: :allow,
+      reason: :rule_allowed,
+      engine: Fake,
       policy_version: nil,
-      operation_id: Id.new(),
-      at: DateTime.utc_now()
+      correlation_id: Id.new(),
+      decided_at: DateTime.utc_now()
     }
   end
 end

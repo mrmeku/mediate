@@ -2,18 +2,18 @@ defmodule Mediate.SchemaTest do
   use ExUnit.Case, async: true
 
   alias Mediate.Schema.Fact
-  alias Mediate.Schema.Relationship
+  alias Mediate.Schema.Grant
 
   defmodule Declared do
     @moduledoc false
     use Mediate.Schema
 
-    object_type :thing
-    carries [:parts, :notes]
-    audited :entity
-    fact(:owner_id, kind: :subject_attribute, subject: :owner_id)
-    fact(:labels, kind: :object_attribute, object: :id, element: :label)
-    relationship(subject: :user_id, object: :thing_id, attributes: [:role])
+    resource_type(:thing)
+    covers([:parts, :notes])
+    identity(:other)
+    fact(:owner_id, about: :subject, subject: :owner_id)
+    fact(:labels, about: :resource, resource: :id, element: :label)
+    grant(subject: :user_id, resource: :thing_id, attributes: [:role])
   end
 
   defmodule Empty do
@@ -22,106 +22,112 @@ defmodule Mediate.SchemaTest do
   end
 
   test "a schema records its declarations in order" do
-    assert Declared.__mediate__(:object_type) == :thing
-    assert Declared.__mediate__(:carries) == [:parts, :notes]
-    assert Declared.__mediate__(:kind) == :entity
+    assert Declared.__mediate__(:resource_type) == :thing
+    assert Declared.__mediate__(:covers) == [:parts, :notes]
+    assert Declared.__mediate__(:identity) == :other
 
     assert Declared.__mediate__(:facts) == [
-             %Fact{column: :owner_id, kind: :subject_attribute, subject: :owner_id, object: nil, element: nil},
-             %Fact{column: :labels, kind: :object_attribute, subject: nil, object: :id, element: :label}
+             %Fact{column: :owner_id, about: :subject, subject: :owner_id, resource: nil, element: nil},
+             %Fact{column: :labels, about: :resource, subject: nil, resource: :id, element: :label}
            ]
 
-    assert Declared.__mediate__(:relationship) == %Relationship{
-             subject: :user_id,
-             object: :thing_id,
-             attributes: [:role]
-           }
+    assert Declared.__mediate__(:grant) == %Grant{subject: :user_id, resource: :thing_id, attributes: [:role]}
   end
 
   test "a schema without declarations answers nil and empty" do
-    assert Empty.__mediate__(:object_type) == nil
-    assert Empty.__mediate__(:carries) == []
-    assert Empty.__mediate__(:kind) == nil
+    assert Empty.__mediate__(:resource_type) == nil
+    assert Empty.__mediate__(:covers) == []
+    assert Empty.__mediate__(:identity) == nil
     assert Empty.__mediate__(:facts) == []
-    assert Empty.__mediate__(:relationship) == nil
+    assert Empty.__mediate__(:grant) == nil
   end
 
-  test "a schema is audited when it declares what kind of thing its rows are" do
-    assert Mediate.Schema.kind_of(Declared) == :entity
-    assert Mediate.Schema.audited?(Declared)
-    refute Mediate.Schema.audited?(Empty)
-    assert Mediate.Schema.kind_of(Empty) == nil
+  test "a schema is an identity schema when it declares what kind of identity its rows are" do
+    assert Mediate.Schema.identity_of(Declared) == :other
+    assert Mediate.Schema.identity?(Declared)
+    refute Mediate.Schema.identity?(Empty)
+    assert Mediate.Schema.identity_of(Empty) == nil
   end
 
-  test "a kind the change event does not carry is refused, and a second one raises" do
-    assert_raise ArgumentError, ~r/audited expects one of/, fn ->
-      defmodule BadAudited do
+  test "the readers answer the declarations and the fact columns each once" do
+    assert Mediate.Schema.resource_type_of(Declared) == :thing
+    assert Mediate.Schema.covers_of(Declared) == [:parts, :notes]
+    assert Mediate.Schema.fact_columns(Declared) == [:owner_id, :labels, :user_id, :thing_id, :role]
+    assert Mediate.Schema.fact_schema?(Declared)
+    refute Mediate.Schema.fact_schema?(Empty)
+    assert Mediate.Schema.resource_type_of(Enum) == nil
+    assert Mediate.Schema.covers_of(nil) == []
+  end
+
+  test "an identity kind the write event does not carry is refused, and a second one raises" do
+    assert_raise ArgumentError, ~r/identity expects one of/, fn ->
+      defmodule BadIdentity do
         @moduledoc false
         use Mediate.Schema
 
-        audited :machine
+        identity(:machine)
       end
     end
 
-    assert_raise ArgumentError, ~r/already audited as :user/, fn ->
-      defmodule TwiceAudited do
+    assert_raise ArgumentError, ~r/already declares identity :account/, fn ->
+      defmodule TwiceIdentity do
         @moduledoc false
         use Mediate.Schema
 
-        audited :user
-        audited :role
+        identity(:account)
+        identity(:role)
       end
     end
   end
 
-  test "a second object_type, carries, or relationship raises" do
-    assert_raise ArgumentError, ~r/already declares object_type/, fn ->
+  test "a second resource_type, covers, or grant raises" do
+    assert_raise ArgumentError, ~r/already declares resource_type/, fn ->
       defmodule TwoTypes do
         @moduledoc false
         use Mediate.Schema
 
-        object_type :a
-        object_type :b
+        resource_type(:a)
+        resource_type(:b)
       end
     end
 
-    assert_raise ArgumentError, ~r/already carries \[:a\]/, fn ->
-      defmodule TwoCarries do
+    assert_raise ArgumentError, ~r/already covers \[:a\]/, fn ->
+      defmodule TwoCovers do
         @moduledoc false
         use Mediate.Schema
 
-        carries [:a]
-        carries [:b, :a]
+        covers([:a])
+        covers([:b, :a])
       end
     end
 
-    assert_raise ArgumentError, ~r/already declares a relationship/, fn ->
-      defmodule TwoRelationships do
+    assert_raise ArgumentError, ~r/already declares a grant/, fn ->
+      defmodule TwoGrants do
         @moduledoc false
         use Mediate.Schema
 
-        relationship(subject: :a, object: :b)
-        relationship(subject: :c, object: :d)
+        grant(subject: :a, resource: :b)
+        grant(subject: :c, resource: :d)
       end
     end
   end
 
-  test "a fact with an unknown kind or a relationship without an object is refused" do
+  test "a fact about an unknown party or a grant without a resource is refused" do
     assert_raise NimbleOptions.ValidationError, fn ->
-      defmodule BadKind do
+      defmodule BadAbout do
         @moduledoc false
         use Mediate.Schema
 
-        fact(:x, kind: :other)
+        fact(:x, about: :other)
       end
     end
 
     assert_raise NimbleOptions.ValidationError, fn ->
-      defmodule BadRelationship do
+      defmodule BadGrant do
         @moduledoc false
         use Mediate.Schema
 
-        relationship(subject: :a)
+        grant(subject: :a)
       end
     end
   end

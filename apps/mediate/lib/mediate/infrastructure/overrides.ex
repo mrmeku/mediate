@@ -1,13 +1,13 @@
 defmodule Mediate.Infrastructure.Overrides do
   @moduledoc false
   # Generates, at the repo's `@before_compile`, the override of every
-  # function of the surface the repo defines. Each override calls the seam
-  # with the arguments and a function. That function runs Ecto's own
-  # definition with the options the seam settled. This module writes calls
+  # function of the surface the repo defines. Each override calls the
+  # enforcement with the arguments and a function. That function runs
+  # Ecto's own definition with the options the enforcement settled. This module writes calls
   # into a module under compilation, and that is what puts it here rather
   # than beside what decides.
 
-  alias Mediate.Infrastructure.Seam
+  alias Mediate.Infrastructure.Enforcement
 
   @doc false
   defmacro __before_compile__(env) do
@@ -47,7 +47,7 @@ defmodule Mediate.Infrastructure.Overrides do
         defoverridable prepare_query: 3
 
         def prepare_query(operation, query, opts) do
-          {query, opts} = Seam.prepare(__MODULE__, operation, query, opts)
+          {query, opts} = Enforcement.prepare(__MODULE__, operation, query, opts)
           super(operation, query, opts)
         end
       end
@@ -86,7 +86,9 @@ defmodule Mediate.Infrastructure.Overrides do
   defp aggregate_three do
     quote do
       def aggregate(queryable, aggregate, opts) when is_list(opts) do
-        Seam.query(__MODULE__, {:aggregate, 3}, queryable, opts, fn opts -> super(queryable, aggregate, opts) end)
+        Enforcement.query(__MODULE__, {:aggregate, 3}, queryable, opts, fn opts ->
+          super(queryable, aggregate, opts)
+        end)
       end
     end
   end
@@ -94,7 +96,7 @@ defmodule Mediate.Infrastructure.Overrides do
   defp aggregate_four do
     quote do
       def aggregate(queryable, aggregate, field, opts) do
-        Seam.query(__MODULE__, {:aggregate, 4}, queryable, opts, fn opts ->
+        Enforcement.query(__MODULE__, {:aggregate, 4}, queryable, opts, fn opts ->
           super(queryable, aggregate, field, opts)
         end)
       end
@@ -118,38 +120,62 @@ defmodule Mediate.Infrastructure.Overrides do
 
     quote do
       def unquote(name)(unquote_splicing(args), unquote(opts)) do
-        unquote(seam(name, bucket, call, args, opts, continue))
+        unquote(enforce(name, bucket, call, args, opts, continue))
       end
     end
   end
 
-  defp seam(name, :query, call, [queryable | _rest], opts, continue) when name in [:update_all, :delete_all] do
+  defp enforce(name, :query, call, [queryable | _rest], opts, continue) when name in [:update_all, :delete_all] do
     quote do
-      Seam.bulk(__MODULE__, unquote(call), unquote(queryable), unquote(opts), unquote(continue))
+      Enforcement.bulk(
+        __MODULE__,
+        unquote(call),
+        unquote(queryable),
+        unquote(opts),
+        unquote(continue)
+      )
     end
   end
 
-  defp seam(_name, :query, call, [target | _rest], opts, continue) do
+  defp enforce(_name, :query, call, [target | _rest], opts, continue) do
     quote do
-      Seam.query(__MODULE__, unquote(call), unquote(target), unquote(opts), unquote(continue))
+      Enforcement.query(
+        __MODULE__,
+        unquote(call),
+        unquote(target),
+        unquote(opts),
+        unquote(continue)
+      )
     end
   end
 
-  defp seam(:insert_all, :write, call, [source, _entries], opts, continue) do
+  defp enforce(:insert_all, :write, call, [source, _entries], opts, continue) do
     quote do
-      Seam.write_all(__MODULE__, unquote(call), unquote(source), unquote(opts), unquote(continue))
+      Enforcement.write_all(
+        __MODULE__,
+        unquote(call),
+        unquote(source),
+        unquote(opts),
+        unquote(continue)
+      )
     end
   end
 
-  defp seam(_name, :write, call, [changeset], opts, continue) do
+  defp enforce(_name, :write, call, [changeset], opts, continue) do
     quote do
-      Seam.write(__MODULE__, unquote(call), unquote(changeset), unquote(opts), unquote(continue))
+      Enforcement.write(
+        __MODULE__,
+        unquote(call),
+        unquote(changeset),
+        unquote(opts),
+        unquote(continue)
+      )
     end
   end
 
-  defp seam(_name, :raw, call, _args, opts, continue) do
+  defp enforce(_name, :raw, call, _args, opts, continue) do
     quote do
-      Seam.raw(__MODULE__, unquote(call), unquote(opts), unquote(continue))
+      Enforcement.raw(__MODULE__, unquote(call), unquote(opts), unquote(continue))
     end
   end
 end

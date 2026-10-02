@@ -50,14 +50,14 @@ defmodule Example.Scenarios.TableTest do
   end
 
   defp row(line) do
-    [id, sentence, group, controls, tests] = cells(line)
+    [id, sentence, group, controls, clauses] = cells(line)
 
     %Row{
       id: String.trim(id, "`"),
       sentence: sentence,
       group: atomize(group),
       controls: String.split(controls, ", "),
-      tests: tests(tests)
+      clauses: clauses(clauses)
     }
   end
 
@@ -69,14 +69,14 @@ defmodule Example.Scenarios.TableTest do
     |> Enum.map(&String.trim/1)
   end
 
-  # A rules cell reads "C1, C6". The review scenario names the verb.
-  defp tests("C" <> _rest = rules) do
-    rules
+  # A clauses cell reads "C1, C6". The access review scenario names the call.
+  defp clauses("C" <> _rest = clauses) do
+    clauses
     |> String.split(", ")
     |> Enum.map(&atomize/1)
   end
 
-  defp tests(verb), do: [atomize(verb)]
+  defp clauses(call), do: [atomize(call)]
 
   defp atomize(text) do
     text

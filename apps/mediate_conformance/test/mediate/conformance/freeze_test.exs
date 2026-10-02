@@ -1,24 +1,24 @@
 defmodule Mediate.Conformance.FreezeTest do
   @moduledoc """
   The frozen tables. A change here follows a change to `docs/conformance.md`
-  under "The laws" or "The guarantees", in the same commit.
+  under "The engine requirements" or "The repo requirements", in the same
+  commit.
   """
 
   use ExUnit.Case, async: true
 
-  alias Mediate.Conformance.Law
-  alias Mediate.Conformance.RepoCase
+  alias Mediate.Conformance.Requirement
 
   @moduletag :freeze
 
   @conformance Path.expand("../../../../../docs/conformance.md", __DIR__)
 
-  test "the law table equals docs/conformance.md under The laws" do
-    assert Law.all() == Enum.map(rows("\n## The laws"), &law/1)
+  test "the engine table equals docs/conformance.md under The engine requirements" do
+    assert Requirement.all(:engine) == Enum.map(rows("\n## The engine requirements"), &requirement/1)
   end
 
-  test "the guarantee table equals docs/conformance.md under The guarantees" do
-    assert RepoCase.guarantees() == Enum.map(rows("\n## The guarantees"), &guarantee/1)
+  test "the repo table equals docs/conformance.md under The repo requirements" do
+    assert Requirement.all(:repo) == Enum.map(rows("\n## The repo requirements"), &requirement/1)
   end
 
   # The table rows of one section, each as its cells.
@@ -34,11 +34,9 @@ defmodule Mediate.Conformance.FreezeTest do
     |> Enum.map(&cells/1)
   end
 
-  defp law([id, sentence, controls]) do
-    %Law{id: String.trim(id, "`"), sentence: sentence, controls: String.split(controls, ", ")}
+  defp requirement([id, text, controls]) do
+    %Requirement{id: String.trim(id, "`"), text: text, controls: String.split(controls, ", ")}
   end
-
-  defp guarantee([id, sentence]), do: {String.trim(id, "`"), sentence}
 
   defp cells(line) do
     line

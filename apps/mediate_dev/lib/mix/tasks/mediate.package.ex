@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Mediate.Package do
-  @shortdoc "Builds the deployable of every published package, and checks what each one carries"
+  @shortdoc "Builds the tarball of every published package, and checks what each one carries"
   @moduledoc """
   Builds the tarball of every package this repository publishes, with
   `MEDIATE_UMBRELLA` removed, and unpacks it under `tmp/package/`.
@@ -8,13 +8,13 @@ defmodule Mix.Tasks.Mediate.Package do
       mix mediate.package --check
 
   With `--check` the task reads `hex_metadata.config` out of each unpacked
-  tarball and fails on anything that would reach Hex wrong: a sibling the
-  package names in production and does not require, a requirement pinned to
-  an exact version, a missing license, description, or link, a LICENSE that
-  is not the one at the repository root, and a version that differs across
-  the set.
+  tarball and fails on each problem, a thing that would reach Hex wrong: a
+  sibling the package names in production and does not require, a
+  requirement pinned to an exact version, a missing license, description, or
+  link, a LICENSE that is not the one at the repository root, and a version
+  that differs across the published packages.
 
-  The unpacked packages are what the example applications run against:
+  The unpacked packages are what the example deployments run against:
 
       mix mediate.package
       cd apps/example_rbac && MEDIATE_PACKAGES=../../tmp/package \\
@@ -57,7 +57,7 @@ defmodule Mix.Tasks.Mediate.Package do
 
   defp report([]), do: Mix.shell().info("every published package carries what Hex needs")
 
-  defp report(violations) do
-    Mix.raise("the built packages would reach Hex wrong:\n" <> Enum.map_join(violations, "\n", &("  " <> &1)))
+  defp report(problems) do
+    Mix.raise("the built packages would reach Hex wrong:\n" <> Enum.map_join(problems, "\n", &("  " <> &1)))
   end
 end

@@ -11,7 +11,7 @@ defmodule Example.Domain.RollupTest do
     check all(visibilities <- visibilities()) do
       rollup = Rollup.of(visibilities)
 
-      for visibility <- visibilities, do: assert(Rollup.covers?(rollup, visibility))
+      for visibility <- visibilities, do: assert(Rollup.includes?(rollup, visibility))
     end
   end
 
@@ -45,7 +45,7 @@ defmodule Example.Domain.RollupTest do
 
   property "a directory added to a repository never widens its rollup" do
     check all(visibilities <- visibilities(), extra <- visibility()) do
-      assert Rollup.covers?(Rollup.of([extra | visibilities]), Rollup.of(visibilities))
+      assert Rollup.includes?(Rollup.of([extra | visibilities]), Rollup.of(visibilities))
     end
   end
 
@@ -54,8 +54,8 @@ defmodule Example.Domain.RollupTest do
       middle = Rollup.of([one, two])
       wide = Rollup.of([middle, three])
 
-      assert Rollup.covers?(one, one)
-      assert Rollup.covers?(wide, one)
+      assert Rollup.includes?(one, one)
+      assert Rollup.includes?(wide, one)
     end
   end
 
@@ -80,7 +80,7 @@ defmodule Example.Domain.RollupTest do
   defp row do
     fixed_map(%{
       labels: list_of(member_of(~w(crypto secrets docs)), max_length: 3),
-      restrictions: list_of(member_of(Restrictions.all()), max_length: 3),
+      restrictions: list_of(member_of(Restrictions.kinds()), max_length: 3),
       releasable_to: list_of(member_of(@countries), max_length: 3)
     })
   end
@@ -118,14 +118,14 @@ defmodule Example.Domain.RollupTest do
   test "a rollup covers a visibility when it carries every label and restriction the visibility does" do
     rollup = %{restrictions: [:export_controlled, :employees_only], labels: ["crypto"]}
 
-    assert Rollup.covers?(rollup, %{restrictions: [:export_controlled]})
-    refute Rollup.covers?(%{restrictions: [:export_controlled]}, rollup)
+    assert Rollup.includes?(rollup, %{restrictions: [:export_controlled]})
+    refute Rollup.includes?(%{restrictions: [:export_controlled]}, rollup)
   end
 
   test "a rollup covers a visibility with REGIONS when it releases to no country outside the visibility's list" do
     visibility = %{restrictions: [:releasable_to], releasable_to: ["US"]}
 
-    assert Rollup.covers?(%{restrictions: [:releasable_to], releasable_to: ["US"]}, visibility)
-    refute Rollup.covers?(%{restrictions: [:releasable_to], releasable_to: ["FR", "US"]}, visibility)
+    assert Rollup.includes?(%{restrictions: [:releasable_to], releasable_to: ["US"]}, visibility)
+    refute Rollup.includes?(%{restrictions: [:releasable_to], releasable_to: ["FR", "US"]}, visibility)
   end
 end

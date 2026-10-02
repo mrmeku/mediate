@@ -1,7 +1,7 @@
 defmodule Mediate.Cerbos.Conformance.Memberships do
   @moduledoc """
-  The fixture's memberships as the two subqueries the declarations name:
-  an account's roles on a folder, and its roles on an item's folder. Each
+  The world's memberships as the two subqueries the declarations name: an
+  account's roles on a folder, and its roles on an item's folder. Each
   selects the row the value belongs to, and the value as text, because a
   policy compares text. A membership counts when the subject's kind holds
   it and it has not expired at the moment the request carries. So a role
@@ -14,8 +14,8 @@ defmodule Mediate.Cerbos.Conformance.Memberships do
   alias Mediate.Fixture.Membership
 
   @doc "The roles the subject holds live, by folder."
-  @spec folder_roles_for(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
-  def folder_roles_for({kind, id}, %{now: now}) do
+  @spec folder_roles(Mediate.subject(), Mediate.context()) :: Ecto.Query.t()
+  def folder_roles({kind, id}, %{now: now}) do
     from(m in Membership,
       where: m.account_id == ^id and m.subject_kind == ^kind,
       where: is_nil(m.expires_at) or m.expires_at > ^now,
@@ -24,8 +24,8 @@ defmodule Mediate.Cerbos.Conformance.Memberships do
   end
 
   @doc "The roles the subject holds live on each item's folder, by item."
-  @spec item_roles_for(Mediate.subject(), Mediate.environment()) :: Ecto.Query.t()
-  def item_roles_for({kind, id}, %{now: now}) do
+  @spec item_roles(Mediate.subject(), Mediate.context()) :: Ecto.Query.t()
+  def item_roles({kind, id}, %{now: now}) do
     from(i in Item,
       join: m in Membership,
       on: m.folder_id == i.folder_id,

@@ -1,56 +1,55 @@
 defmodule Mediate.Postgres.Version do
   @moduledoc """
-  The policy version of row-level security: the migration number.
-
-  A migration that changes a policy appends its own version in the same
+  The policy version of row-level security: the migration number. A
+  migration that changes a rule appends its own version in the same
   transaction as its DDL. So the rules and the record of what they became
   commit together or not at all, and a decision after it names that
-  number. [the events document](https://hexdocs.pm/mediate/events.html)
-  under "Policy version" has the event and what it carries.
+  number. The events document under "Policy release" has the event and
+  the cap.
 
-  The content is the policies as `pg_policy` renders them. A version
-  carries it by value under the cap the caller gives, and as a pointer to
-  the tables above it. The content hash is the SHA-256 of that text either
-  way.
+  The text is the rules as `pg_policy` renders them. The release carries
+  it by value when under the cap the caller gives, and the tables as its
+  location otherwise. The text hash is the sha256 of that text either way.
+  `Mediate.Postgres.Migration.release!/2` builds the release and publishes
+  it, in the migration's transaction.
   """
 
-  alias Mediate.PolicyVersion
-  alias Mediate.Postgres.Catalog
-  alias Mediate.Postgres.Infrastructure
-  alias Mediate.Postgres.Policy
+  alias Mediate.PolicyRelease
+  alias Mediate.Postgres.Rule
 
-  @doc "The telemetry event `publish/1` emits, once per call."
-  @spec telemetry_event() :: [atom()]
-  def telemetry_event, do: Infrastructure.Version.telemetry_event()
+  @doc "The policy's text: each rule as `Mediate.Postgres.Rule.to_text/1` renders it."
+  @spec text([Rule.t()]) :: String.t()
+  def text(rules) when is_list(rules), do: Enum.map_join(rules, "", &Rule.to_text/1)
+
+  @doc "The sha256 of `text/1`, in lower-case hex."
+  @spec text_hash([Rule.t()]) :: String.t()
+  def text_hash(rules) when is_list(rules), do: Base.encode16(:crypto.hash(:sha256, text(rules)), case: :lower)
 
   @doc """
-  The version a migration publishes, from the policies it read back.
-  Requires `version:`, `author:`, `approval:`, `at:`, and `content_bytes:`.
+  The release of `engine` as the event carries it, with the text by value
+  when under the cap. Requires `policy_version:`, `author:`, `approval:`,
+  `released_at:`, and `policy_text_bytes:`.
   """
-  @spec of(module(), [Policy.t()], keyword()) :: PolicyVersion.t()
-  def of(adapter, policies, options) when is_atom(adapter) and is_list(policies) and is_list(options) do
-    text = Catalog.to_text(policies)
-    carried? = byte_size(text) <= Keyword.fetch!(options, :content_bytes)
+  @spec release(module(), [Rule.t()], keyword()) :: PolicyRelease.t()
+  def release(engine, rules, options) when is_atom(engine) and is_list(rules) and is_list(options) do
+    text = text(rules)
+    under_cap? = byte_size(text) <= Keyword.fetch!(options, :policy_text_bytes)
 
-    %PolicyVersion{
-      adapter: adapter,
-      version: to_string(Keyword.fetch!(options, :version)),
-      content_hash: Base.encode16(:crypto.hash(:sha256, text), case: :lower),
-      content: if(carried?, do: text),
-      pointer: if(carried?, do: nil, else: pointer(policies)),
+    %PolicyRelease{
+      engine: engine,
+      policy_version: to_string(Keyword.fetch!(options, :policy_version)),
+      text_hash: text_hash(rules),
+      text: if(under_cap?, do: text),
+      text_location: if(under_cap?, do: nil, else: location(rules)),
       author: Keyword.fetch!(options, :author),
       approval: Keyword.fetch!(options, :approval),
-      at: Keyword.fetch!(options, :at)
+      released_at: Keyword.fetch!(options, :released_at)
     }
   end
 
-  @doc "Emit the version once per call, and answer the version it emitted."
-  @spec publish(PolicyVersion.t()) :: {:ok, PolicyVersion.t()}
-  def publish(%PolicyVersion{} = version), do: Infrastructure.Version.publish(version)
-
-  defp pointer(policies) do
+  defp location(rules) do
     tables =
-      policies
+      rules
       |> Enum.map(& &1.table)
       |> Enum.uniq()
       |> Enum.sort()

@@ -3,19 +3,19 @@ defmodule Mediate.Rbac.DecideTest do
 
   import Ecto.Query, only: [dynamic: 2]
 
-  alias Mediate.Answer
-  alias Mediate.Conformance.Fixture.World
+  alias Mediate.Conformance.Reference.World
   alias Mediate.Dev.Sandbox
   alias Mediate.Error
   alias Mediate.Fixture.Folder
   alias Mediate.Rbac.Binding
-  alias Mediate.Rbac.Conformance.Roles
+  alias Mediate.Rbac.Conformance.Reference
   alias Mediate.TestRepos.Sandboxed
+  alias Mediate.Verdict
 
   defmodule Broken do
     @moduledoc false
-    @spec garbage(Mediate.subject(), Mediate.environment()) :: term()
-    def garbage(_subject, _environment), do: :not_a_dynamic
+    @spec garbage(Mediate.subject(), Mediate.context()) :: term()
+    def garbage(_subject, _context), do: :not_a_dynamic
   end
 
   defmodule BrokenPolicy do
@@ -24,15 +24,15 @@ defmodule Mediate.Rbac.DecideTest do
 
     role :reader, [:read]
 
-    object Folder do
+    resource Folder do
       predicate :garbage, &Broken.garbage/2
     end
   end
 
   setup tags do
     :ok = Sandbox.setup(Sandboxed, tags)
-    :ok = Mediate.Test.with_config(adapter: Mediate.Rbac)
-    :ok = Binding.override(policy: Roles, repo: Sandboxed)
+    :ok = Mediate.Test.with_config(engine: Mediate.Rbac)
+    :ok = Binding.override(policy: Reference, repo: Sandboxed)
 
     world =
       Map.put(
@@ -41,70 +41,70 @@ defmodule Mediate.Rbac.DecideTest do
         %{{"ann", 1} => World.held(:reader), {"bob", 1} => World.held(:editor)}
       )
 
-    :ok = World.insert(Sandboxed, world)
-    environment = %{now: DateTime.utc_now()}
-    {:ok, environment: environment, ann: {:user, "ann"}, bob: {:user, "bob"}}
+    :ok = World.write(Sandboxed, world)
+    context = %{now: DateTime.utc_now()}
+    {:ok, context: context, ann: {:user, "ann"}, bob: {:user, "bob"}}
   end
 
-  test "the answer names the clauses that held and the reason names the grant or the failing predicate", ctx do
+  test "the verdict names the rules that held and the reason names the grant or the failing predicate", ctx do
     folder = {:folder, 1}
 
-    allowed = %{rule: "membership", matched: [:membership, :cleared, :held]}
+    allowed = %{rule: "membership", matched: ["membership", "cleared", "held"]}
 
-    assert {:ok, %Answer{verdict: :allow, reason: :allowed, meta: ^allowed}} =
-             Mediate.Rbac.decide(ctx.ann, :read, folder, ctx.environment, [])
+    assert {:ok, %Verdict{effect: :allow, reason: :rule_allowed, meta: ^allowed}} =
+             Mediate.Rbac.authorize(ctx.ann, :read, folder, ctx.context, [])
 
-    denied = %{rule: "cleared", matched: [:membership, :held]}
+    denied = %{rule: "cleared", matched: ["membership", "held"]}
 
-    assert {:ok, %Answer{verdict: :deny, reason: :rule_denied, meta: ^denied}} =
-             Mediate.Rbac.decide(ctx.bob, :edit, folder, ctx.environment, [])
+    assert {:ok, %Verdict{effect: :deny, reason: :rule_denied, meta: ^denied}} =
+             Mediate.Rbac.authorize(ctx.bob, :edit, folder, ctx.context, [])
 
-    assert {:ok, %Answer{reason: :deny_by_default, meta: %{matched: [:cleared, :held]}}} =
-             Mediate.Rbac.decide(ctx.ann, :edit, folder, ctx.environment, [])
+    assert {:ok, %Verdict{reason: :no_rule_matched, meta: %{matched: ["cleared", "held"]}}} =
+             Mediate.Rbac.authorize(ctx.ann, :edit, folder, ctx.context, [])
 
-    assert {:ok, %Answer{reason: :deny_by_default, meta: %{matched: []}}} =
-             Mediate.Rbac.decide(ctx.ann, :read, {:folder, 404}, ctx.environment, [])
+    assert {:ok, %Verdict{reason: :no_rule_matched, meta: %{matched: []}}} =
+             Mediate.Rbac.authorize(ctx.ann, :read, {:folder, 404}, ctx.context, [])
   end
 
-  test "an item answers as its folder does, through the grant's on column", ctx do
+  test "an item answers as its folder does, through the grant rule's on column", ctx do
     item = {:item, 10}
-    assert {:ok, %Answer{verdict: :allow}} = Mediate.Rbac.decide(ctx.ann, :read, item, ctx.environment, [])
-    assert {:ok, %Answer{verdict: :deny}} = Mediate.Rbac.decide(ctx.ann, :edit, item, ctx.environment, [])
+    assert {:ok, %Verdict{effect: :allow}} = Mediate.Rbac.authorize(ctx.ann, :read, item, ctx.context, [])
+    assert {:ok, %Verdict{effect: :deny}} = Mediate.Rbac.authorize(ctx.ann, :edit, item, ctx.context, [])
   end
 
-  test "an unknown operation and an unknown object type are denied with their reasons", ctx do
+  test "an unknown action and an unknown resource type are denied with their reasons", ctx do
     folder = {:folder, 1}
 
-    assert {:ok, %Answer{verdict: :deny, reason: :unknown_operation}} =
-             Mediate.Rbac.decide(ctx.ann, :delete, folder, ctx.environment, [])
+    assert {:ok, %Verdict{effect: :deny, reason: :action_unknown}} =
+             Mediate.Rbac.authorize(ctx.ann, :delete, folder, ctx.context, [])
 
-    assert {:ok, %Answer{verdict: :deny, reason: :deny_by_default}} =
-             Mediate.Rbac.decide(ctx.ann, :read, {:document, 1}, ctx.environment, [])
+    assert {:ok, %Verdict{effect: :deny, reason: :no_rule_matched}} =
+             Mediate.Rbac.authorize(ctx.ann, :read, {:document, 1}, ctx.context, [])
 
-    assert {:ok, {rule, %Answer{verdict: :deny}}} =
-             Mediate.Rbac.scope(ctx.ann, :delete, :folder, ctx.environment, [])
+    assert {:ok, {expression, %Verdict{effect: :deny}}} =
+             Mediate.Rbac.filter(ctx.ann, :delete, :folder, ctx.context, [])
 
-    assert inspect(rule) == inspect(dynamic([_row], false))
+    assert inspect(expression) == inspect(dynamic([_row], false))
   end
 
-  test "one decision is one query", ctx do
-    {answer, queries} =
+  test "one verdict is one query", ctx do
+    {verdict, queries} =
       Mediate.Test.queries(Sandboxed, fn ->
-        {:ok, answer} = Mediate.Rbac.decide(ctx.ann, :read, {:folder, 1}, ctx.environment, [])
-        answer
+        {:ok, verdict} = Mediate.Rbac.authorize(ctx.ann, :read, {:folder, 1}, ctx.context, [])
+        verdict
       end)
 
-    assert %Answer{verdict: :allow} = answer
+    assert %Verdict{effect: :allow} = verdict
     assert length(queries) == 1
   end
 
-  test "a predicate that returns neither a dynamic nor a boolean is an engine error", ctx do
+  test "a predicate that returns neither a dynamic nor a boolean is an engine failure", ctx do
     :ok = Binding.override(policy: BrokenPolicy)
 
-    assert {:error, %Error{reason: :engine_unreachable, detail: detail}} =
-             Mediate.Rbac.decide(ctx.ann, :read, {:folder, 1}, ctx.environment, [])
+    assert {:error, %Error{reason: :engine_failed, message: message}} =
+             Mediate.Rbac.authorize(ctx.ann, :read, {:folder, 1}, ctx.context, [])
 
-    assert detail =~ "Mediate.Rbac failed during decide"
-    assert detail =~ "predicate garbage returned :not_a_dynamic"
+    assert message ==
+             "Mediate.Rbac failed during authorize: predicate garbage returned :not_a_dynamic, not a dynamic or a boolean"
   end
 end

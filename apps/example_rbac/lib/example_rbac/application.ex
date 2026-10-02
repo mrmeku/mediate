@@ -1,41 +1,41 @@
 defmodule ExampleRbac.Application do
   @moduledoc """
-  The boot of the example under RBAC in code. It does four things in order:
+  The boot of the example under roles in code. It does four things in order:
 
-  - the configuration names the adapter
-  - the binding names the policy and the repo
-  - the supervisor starts the repos and the consumer of the events
-  - the publish emits the policy version once the tree is up
+  - the configuration names the engine
+  - the binding names the policy module and the repo
+  - the supervisor starts the repos and the security log consumer
+  - the policy release is published once the tree is up
 
-  The test configuration leaves the repos to the ephemeral cluster, and with
-  them the publish. So a run has one policy-version event rather than two.
+  The test configuration leaves the repos to the run's cluster, and with
+  them the policy release. So a run has one policy release rather than two.
   """
 
   use Application
 
   alias Example.Infrastructure.Repo
-  alias Example.Infrastructure.Siem
+  alias Example.Infrastructure.SIEM
   alias Mediate.Rbac.Binding
 
   @impl Application
   def start(_type, _args) do
-    _config = Mediate.Config.boot!(adapter: Mediate.Rbac)
+    _config = Mediate.Config.boot!(engine: Mediate.Rbac)
     _binding = Binding.bind!(policy: ExampleRbac.Infrastructure.Policy, repo: Repo)
     repos = repos()
-    children = [{Siem, name: Siem, attach: true} | repos]
+    children = [{SIEM, name: SIEM, attach: true} | repos]
 
     with {:ok, pid} <- Supervisor.start_link(children, strategy: :one_for_one, name: ExampleRbac.Supervisor) do
-      :ok = publish(repos)
+      :ok = release(repos)
       {:ok, pid}
     end
   end
 
-  # The publish belongs to whoever starts the repos: this tree, or the test
-  # cluster.
-  defp publish([]), do: :ok
+  # The policy release belongs to whoever starts the repos: this tree, or the
+  # test cluster.
+  defp release([]), do: :ok
 
-  defp publish(_repos) do
-    {:ok, _published} = Mediate.Rbac.publish()
+  defp release(_repos) do
+    {:ok, _release} = Mediate.Rbac.release()
     :ok
   end
 

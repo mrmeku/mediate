@@ -1,17 +1,17 @@
 defmodule Example.Scenarios do
   @moduledoc """
-  Every scenario of the table in `docs/example.md` under "The scenarios", declared once here.
-  `use Example.Scenarios` defines them in a thin application's test module.
-  The adapter comes from the thin application's boot configuration, not from
-  the test.
+  Every scenario of the table in `docs/example.md` under "The scenarios",
+  declared once here. `use Example.Scenarios` defines them in a
+  deployment's test module. The engine comes from the deployment's boot
+  configuration, not from the test.
 
   Each scenario's body is a function in a module under this one, named by
-  the scenario's id. The scenario that measures latency, `rev-01`, runs on
-  the committed database in a nested module that is not async. Every other
-  scenario runs in a sandbox transaction. The last test counts: the
-  scenarios defined are the table's rows, every one of them.
+  the scenario's id. The scenario that measures latency, `rev-01`, is
+  durable: it commits, so it runs in a nested module that is not async.
+  Every other scenario runs in a sandbox transaction. The last test counts:
+  the scenarios defined are the table's rows, every one of them.
 
-  A thin application whose engine keeps state of its own passes `setup:`. It
+  A deployment whose engine keeps state of its own passes `setup:`. It
   names a module whose `setup/1` puts in place what each test needs. The
   template calls it with the test's tags after the connection is there and
   the tables are empty.
@@ -22,10 +22,10 @@ defmodule Example.Scenarios do
     deps: [
       Example,
       Example.Fixture,
+      Example.Scenarios.AccessReview,
       Example.Scenarios.Enforcement,
-      Example.Scenarios.Identity,
       Example.Scenarios.Privilege,
-      Example.Scenarios.Review,
+      Example.Scenarios.Reauthentication,
       Example.Scenarios.Revocation,
       Ecto.Adapters.SQL,
       ExUnit,
@@ -44,16 +44,16 @@ defmodule Example.Scenarios do
     Example.Scenarios.Enforcement,
     Example.Scenarios.Privilege,
     Example.Scenarios.Revocation,
-    Example.Scenarios.Review,
-    Example.Scenarios.Identity
+    Example.Scenarios.AccessReview,
+    Example.Scenarios.Reauthentication
   ]
 
-  @committed ~w[rev-01]
+  @durable ~w[rev-01]
 
   @doc false
   defmacro __using__(opts) do
     setup = Keyword.get(opts, :setup)
-    {committed, sandboxed} = Enum.split_with(Table.all(), &(&1.id in @committed))
+    {durable, sandboxed} = Enum.split_with(Table.all(), &(&1.id in @durable))
 
     quote do
       use Example.Scenarios.Case, async: true
@@ -64,7 +64,7 @@ defmodule Example.Scenarios do
 
       unquote_splicing(Enum.map(sandboxed, &declare/1))
 
-      defmodule Committed do
+      defmodule Durable do
         @moduledoc false
         use Example.Scenarios.Case, async: false
 
@@ -72,24 +72,24 @@ defmodule Example.Scenarios do
           Example.Scenarios.setup(tags, unquote(setup))
         end
 
-        unquote_splicing(Enum.map(committed, &declare(&1, [:committed])))
+        unquote_splicing(Enum.map(durable, &declare(&1, [:durable])))
       end
 
       test "the scenarios defined are the table's rows, every one of them" do
-        Example.Scenarios.count!([__MODULE__, __MODULE__.Committed])
+        Example.Scenarios.count!([__MODULE__, __MODULE__.Durable])
       end
     end
   end
 
   @doc """
   The per-test setup. An async scenario gets a sandbox connection. A
-  committed one gets a real connection to the same repo, a truncation
+  durable one gets a real connection to the same repo, a truncation
   through the owner repo before the test, and another when it ends. The
-  `setup:` module, where the thin application passed one, runs last.
+  `setup:` module, where the deployment passed one, runs last.
   """
   @spec setup(map(), module() | nil) :: :ok
   def setup(tags, prepare) when is_map(tags) and is_atom(prepare) do
-    if tags[:committed] do
+    if tags[:durable] do
       :ok = Sandbox.checkout(Repo, sandbox: false)
       :ok = Example.Fixture.truncate!(OwnerRepo)
       :ok = prepared(prepare, tags)
@@ -113,13 +113,13 @@ defmodule Example.Scenarios do
   defp prepared(nil, _tags), do: :ok
   defp prepared(prepare, tags), do: prepare.setup(tags)
 
-  defp declare(%Row{id: id, sentence: sentence, tests: [rule | _rest]}, tags \\ []) do
+  defp declare(%Row{id: id, sentence: sentence, clauses: [clause | _rest]}, tags \\ []) do
     {module, function} = body(id)
 
     quote do
       unquote_splicing(Enum.map(tags, &quote(do: @tag(unquote(&1)))))
 
-      scenario unquote(id), unquote(sentence), rule: unquote(rule) do
+      scenario unquote(id), unquote(sentence), clause: unquote(clause) do
         unquote(module).unquote(function)()
       end
     end

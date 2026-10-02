@@ -1,5 +1,5 @@
 defmodule Mediate.Fixture.Account do
-  @moduledoc "An unprotected schema with one subject-attribute fact column."
+  @moduledoc "An unprotected identity schema with one fact column about the subject."
 
   use Ecto.Schema
   use Mediate.Schema
@@ -12,6 +12,6 @@ defmodule Mediate.Fixture.Account do
     field(:clearance, :string)
   end
 
-  audited(:user)
-  fact(:clearance, kind: :subject_attribute, subject: :id)
+  identity(:account)
+  fact(:clearance, about: :subject, subject: :id)
 end

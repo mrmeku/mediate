@@ -22,8 +22,8 @@ defmodule Example.Domain.Restrictions do
   @type visibility :: %{labels: [String.t()], restrictions: [restriction()], releasable_to: [String.t()]}
 
   @doc "Every restriction kind, in the order the example states them."
-  @spec all() :: [restriction()]
-  def all, do: @restrictions
+  @spec kinds() :: [restriction()]
+  def kinds, do: @restrictions
 
   @doc "The visibility fields."
   @spec fields() :: [atom()]

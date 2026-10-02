@@ -2,7 +2,7 @@ defmodule Mediate.Test.Clock do
   @moduledoc """
   The clock a test sets. `set/1` overrides the configured clock for the rest
   of the current process and answers the moment it set. So a test that
-  needs a fixed time names it once, and every call the port makes reads it.
+  needs a fixed time names it once, and every call the library makes reads it.
 
   The configured clock is a zero-arity function, so a test needs no mock
   and no behaviour of its own. `set/1` installs a closure over the moment.

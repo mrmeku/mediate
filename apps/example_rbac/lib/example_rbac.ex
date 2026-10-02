@@ -1,12 +1,12 @@
 defmodule ExampleRbac do
   @moduledoc """
-  The example bound to RBAC in code. Nothing of the domain lives here.
+  The example under roles in code. Nothing of the domain lives here.
 
-  The package holds three things:
+  The deployment holds three things:
 
-  - `ExampleRbac.Infrastructure.Policy`, which states the example's rules as
-    a role table, grants, and predicates
-  - `ExampleRbac.Application`, the boot that binds the policy to
+  - `ExampleRbac.Infrastructure.Policy`, which enforces the example's clauses
+    as a role table, grant rules, and predicate rules
+  - `ExampleRbac.Application`, the boot that binds the policy module to
     `Example.Infrastructure.Repo`
   - the migrations that create the example's tables
   """

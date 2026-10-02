@@ -1,17 +1,18 @@
-# A directory under its own rules. Access path reaches it through its
-# repository's project and owning team (C1), and the restrictions are the
-# ones effective on the directory's own visibility (C2, C3). The embargo date
-# is the repository's, so the attribute declaration carries that test inside
-# the subquery rather than the policy naming a column the directory has not
-# got (C4, C5).
+# A directory under its own visibility. The access path reaches it through
+# its repository's project and owning team (C1), and the restriction kinds
+# are the ones in effect on the directory's own visibility (C2, C3). The
+# embargo is the repository's, so the subquery behind the attribute carries
+# that test, where the policy has no column of the directory to name (C4,
+# C5).
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: default
   resource: directory
   rules:
-    - actions: ["read"]
+    - name: access_path
+      actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           any:
@@ -21,9 +22,10 @@ resourcePolicy:
               - expr: '"admin" in request.resource.attr.team_roles'
               - expr: '"reviewer" in request.resource.attr.team_roles'
 
-    - actions: ["read"]
+    - name: employees_only
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -31,9 +33,10 @@ resourcePolicy:
               - expr: '"employees_only" in request.resource.attr.effective_restrictions'
               - expr: 'request.principal.attr.employment != "employee"'
 
-    - actions: ["read"]
+    - name: export_controlled
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -41,9 +44,10 @@ resourcePolicy:
               - expr: '"export_controlled" in request.resource.attr.effective_restrictions'
               - expr: '!(request.principal.attr.country in request.resource.attr.enterprise_countries)'
 
-    - actions: ["read"]
+    - name: releasable_to
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -51,9 +55,10 @@ resourcePolicy:
               - expr: '"releasable_to" in request.resource.attr.effective_restrictions'
               - expr: '!(request.principal.attr.country in request.resource.attr.releasable_to)'
 
-    - actions: ["read"]
+    - name: invite_only
+      actions: ["read"]
       effect: EFFECT_DENY
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -61,18 +66,19 @@ resourcePolicy:
               - expr: '"invite_only" in request.resource.attr.effective_restrictions'
               - expr: '!(request.principal.id in request.resource.attr.invited)'
 
-    - actions: ["change_visibility"]
+    - name: admin_in_fresh_session
+      actions: ["change_visibility"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
             of:
               - expr: '"admin" in request.resource.attr.team_roles'
-              - expr: request.principal.attr.environment.reauthenticated_at != null
+              - expr: request.principal.attr.context.reauthenticated_at != null
               - expr: >-
-                  timestamp(request.principal.attr.environment.reauthenticated_at)
-                  <= timestamp(request.principal.attr.environment.now)
+                  timestamp(request.principal.attr.context.reauthenticated_at)
+                  <= timestamp(request.principal.attr.context.now)
               - expr: >-
-                  timestamp(request.principal.attr.environment.reauthenticated_at)
-                  >= timestamp(request.principal.attr.environment.now) - duration("900s")
+                  timestamp(request.principal.attr.context.reauthenticated_at)
+                  >= timestamp(request.principal.attr.context.now) - duration("900s")

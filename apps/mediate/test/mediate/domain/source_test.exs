@@ -29,7 +29,7 @@ defmodule Mediate.Domain.SourceTest do
     assert Source.root(series) == nil
   end
 
-  test "to_query/1 turns a schema, struct, changeset, or list into the query the adapter sees" do
+  test "to_query/1 turns a schema, struct, changeset, or list into the query the engine sees" do
     assert %Ecto.Query{from: %{source: {"mediate_fixture_folders", Folder}}} = Source.to_query(Folder)
     assert %Ecto.Query{from: %{source: {"mediate_fixture_items", Item}}} = Source.to_query(%Item{})
     assert %Ecto.Query{from: %{source: {"mediate_fixture_items", Item}}} = Source.to_query(Changeset.change(%Item{}))

@@ -1,0 +1,101 @@
+model
+  schema 1.1
+
+type user
+
+type country
+  relations
+    define member: [user]
+
+type employment
+  relations
+    define member: [user]
+
+type enterprise
+  relations
+    define home: [country]
+    define employee: [employment]
+    define home_member: member from home
+    define employee_member: member from employee
+
+type team
+  relations
+    define enterprise: [enterprise]
+    define admin: [user]
+    define reviewer: [user]
+    define member: admin or reviewer
+    define home_member: home_member from enterprise
+    define employee_member: employee_member from enterprise
+
+type project
+  relations
+    define maintainer: [user]
+    define contributor: [user]
+    define member: contributor or maintainer
+
+type label
+  relations
+    define employee_applies: [user:*]
+    define export_applies: [user:*]
+
+type repository
+  relations
+    define project: [project]
+    define owning_team: [team]
+    define directory: [directory]
+    define label: [label, label with under_embargo]
+    define invited: [user]
+    define releasable_to: [country]
+
+    define employee_applies: [user:*, user:* with under_embargo] or employee_applies from label or employee_applies from directory
+    define export_applies: [user:*, user:* with under_embargo] or export_applies from label or export_applies from directory
+    define country_applies: [user:*, user:* with under_embargo] or country_applies from directory
+    define invite_applies: [user:*, user:* with under_embargo] or invite_applies from directory
+
+    define access_path: member from project or member from owning_team
+    define employee_clear: employee_member from owning_team
+    define export_clear: home_member from owning_team
+    define country_clear: member from releasable_to
+
+    define blocked_by_employee: employee_applies but not employee_clear
+    define blocked_by_export: export_applies but not export_clear
+    define blocked_by_country: country_applies but not country_clear
+    define blocked_by_invite: invite_applies but not invited
+    define blocked: blocked_by_employee or blocked_by_export or blocked_by_country or blocked_by_invite
+
+    define can_read: access_path but not blocked
+    define can_checkout: access_path
+    define can_change_visibility: admin from owning_team
+    define can_set_embargo: can_change_visibility
+    define can_lift_embargo: can_change_visibility
+    define can_propose_visibility: can_change_visibility
+
+type directory
+  relations
+    define repository: [repository]
+    define label: [label, label with under_embargo]
+    define invited: invited from repository
+    define releasable_to: [country]
+
+    define employee_applies: [user:*, user:* with under_embargo] or employee_applies from label
+    define export_applies: [user:*, user:* with under_embargo] or export_applies from label
+    define country_applies: [user:*, user:* with under_embargo]
+    define invite_applies: [user:*, user:* with under_embargo]
+
+    define employee_clear: employee_clear from repository
+    define export_clear: export_clear from repository
+    define country_clear: member from releasable_to
+
+    define blocked: (employee_applies but not employee_clear) or (export_applies but not export_clear) or (country_applies but not country_clear) or (invite_applies but not invited)
+    define can_read: can_checkout from repository but not blocked
+    define can_change_visibility: can_change_visibility from repository
+
+type proposal
+  relations
+    define team: [team]
+    define proposer: [user]
+    define can_approve_visibility: reviewer from team but not proposer
+
+condition under_embargo(lifts_at: timestamp, current_time: timestamp) {
+  current_time < lifts_at
+}

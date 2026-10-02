@@ -41,7 +41,7 @@ defmodule Mediate.Infrastructure.SurfaceTest do
     assert Surface.bucket(:extra, 1) == nil
   end
 
-  test "the seam overrides what a repo defines, so a repo answers the surface Ecto gave it" do
+  test "the mediated repo overrides what a repo defines, so a repo answers the surface Ecto gave it" do
     assert Enum.sort(ExtraRepo.__info__(:functions)) -- [{:extra, 1}] == Enum.sort(Sandboxed.__info__(:functions))
     refute function_exported?(ReadOnlyRepo, :insert, 2)
     assert function_exported?(ReadOnlyRepo, :all, 2)

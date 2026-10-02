@@ -1,5 +1,5 @@
 defmodule Example.Domain.Label do
-  @moduledoc "A label a visibility names. A sensitive label implies restrictions, read at every check and never copied."
+  @moduledoc "A label a visibility names. A sensitive label implies restrictions, read at every decision and never copied."
 
   use Ecto.Schema
   use Mediate.Schema
@@ -12,11 +12,11 @@ defmodule Example.Domain.Label do
 
   schema "labels" do
     field(:sensitive, :boolean, default: false)
-    field(:implied_restrictions, {:array, Ecto.Enum}, values: Restrictions.all(), default: [])
+    field(:implied_restrictions, {:array, Ecto.Enum}, values: Restrictions.kinds(), default: [])
   end
 
-  object_type(:label)
-  audited(:entity)
-  fact(:sensitive, kind: :object_attribute, object: :name)
-  fact(:implied_restrictions, kind: :object_attribute, object: :name, element: :restriction)
+  resource_type(:label)
+  identity(:other)
+  fact(:sensitive, about: :resource, resource: :name)
+  fact(:implied_restrictions, about: :resource, resource: :name, element: :restriction)
 end

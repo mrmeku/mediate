@@ -1,5 +1,5 @@
 defmodule Example.Application.Repositories.RollupViolation do
-  @moduledoc "A rollup that admits a subject a directory denies. The rollup does not cover the directories' own."
+  @moduledoc "A rollup that admits a subject a directory denies. The rollup does not include the directories' own."
 
   alias Example.Domain.Restrictions
 
@@ -14,7 +14,7 @@ defmodule Example.Application.Repositories.RollupViolation do
 end
 
 defmodule Example.Application.Repositories.OverrideRefused do
-  @moduledoc "Why the context refused an override: the account is not privileged, lacks the permission, or gave no justification."
+  @moduledoc "Why the application module refused an override: the account is not privileged, lacks the permission, or gave no justification."
 
   @enforce_keys [:reason]
   defstruct @enforce_keys
@@ -24,15 +24,16 @@ end
 
 defmodule Example.Application.Repositories do
   @moduledoc """
-  Repositories, their rollups, their directories, and the audited override. Every
-  read and write asks the port first and passes the decision to the seam.
-  The context enforces the rollup invariant (C4) at write time. The override
-  (C10) is the one path that reads outside C1. It runs under a declared
-  exemption, with an event and a report of its own.
+  Repositories, their rollups, their directories, and the audited override.
+  Every read and write asks Mediate first and passes the decision to the
+  mediated repo. The application module keeps the rollup (C4) at write
+  time. The override read (C10) is the one path that reads outside C1. It
+  runs under a declared exemption, with an override event and an override
+  report of its own.
 
-  A change that reaches many repositories at once writes a row at a time under
-  the one decision `scope` answers with. So every change event it makes
-  carries that decision's operation id.
+  A change that reaches many repositories at once writes a row at a time
+  under the one decision `filter` answers with. So every identity write
+  event it makes carries that decision's id.
   """
 
   alias Ecto.Changeset
@@ -50,25 +51,26 @@ defmodule Example.Application.Repositories do
   alias Mediate.Decision
   alias Mediate.Error
 
-  @rollup {:exempt, "rollup invariant: the directories' visibilities are read to derive the rollup"}
-  @override {:exempt, "audited override: the read outside C1 that C10 permits, evented and reported"}
+  @rollup {:exempt, "rollup: the directories' visibilities are read to derive the repository's rollup"}
+  @override {:exempt,
+             "audited override: the read outside C1 that C10 permits; it emits the override event and leaves an override report"}
   @override_event [:example, :override, :read]
 
-  @typedoc "What a context function returns when the port refuses."
+  @typedoc "What an application module returns when Mediate refuses."
   @type refusal :: Error.t() | :not_found
 
-  @doc "The operations on a repository, in the order the review prints them."
-  @spec operations() :: [atom()]
-  def operations, do: [:read, :checkout, :change_visibility, :set_embargo, :lift_embargo, :propose_visibility]
+  @doc "The actions on a repository, in the order the access review prints them."
+  @spec actions() :: [atom()]
+  def actions, do: [:read, :checkout, :change_visibility, :set_embargo, :lift_embargo, :propose_visibility]
 
-  @doc "The telemetry event an override read emits, beside the port's own."
+  @doc "The override event: the telemetry event an override read emits, beside Mediate's own."
   @spec override_event() :: [atom()]
   def override_event, do: @override_event
 
   @doc "Read a repository with its rollup, under C1 and C2."
   @spec read(Mediate.subject(), integer(), keyword()) :: {:ok, Repository.t()} | {:error, refusal()}
   def read({_kind, _account} = subject, id, opts \\ []) when is_integer(id) and is_list(opts) do
-    with {:ok, decision} <- Mediate.authorize(subject, :read, object(id), opts) do
+    with {:ok, decision} <- Mediate.authorize(subject, :read, resource(id), opts) do
       fetch(id, decision)
     end
   end
@@ -76,32 +78,32 @@ defmodule Example.Application.Repositories do
   @doc "Read a repository under C1 alone, with the directories the subject can read and no other."
   @spec checkout(Mediate.subject(), integer(), keyword()) :: {:ok, Repository.t()} | {:error, refusal()}
   def checkout({_kind, _account} = subject, id, opts \\ []) when is_integer(id) and is_list(opts) do
-    with {:ok, decision} <- Mediate.authorize(subject, :checkout, object(id), opts),
+    with {:ok, decision} <- Mediate.authorize(subject, :checkout, resource(id), opts),
          {:ok, repository} <- fetch(id, decision) do
       {:ok, %{repository | directories: directories(repository, subject, opts)}}
     end
   end
 
-  @doc "The repositories the subject can read, under `scope`."
+  @doc "The repositories the subject can read: the rows `filter` admits."
   @spec list(Mediate.subject(), keyword()) :: [Repository.t()]
   def list({_kind, _account} = subject, opts \\ []) when is_list(opts) do
-    case Mediate.scope(subject, :read, :repository, opts) do
-      {_rule, %Decision{verdict: :deny}} ->
+    case Mediate.filter(subject, :read, :repository, opts) do
+      {_rule, %Decision{effect: :deny}} ->
         []
 
       {rule, decision} ->
-        Repo.all(RepositoryQuery.scoped(rule), mediate: decision)
+        Repo.all(RepositoryQuery.filtered(rule), authorized_by: decision)
     end
   end
 
   @doc """
-  Change a repository's rollup (C7, C8). The context refuses a rollup that
+  Change a repository's rollup (C7, C8). The application module refuses a rollup that
   admits a subject a directory denies (C4).
   """
   @spec change_visibility(Mediate.subject(), integer(), map(), keyword()) ::
           {:ok, Visibility.t()} | {:error, refusal() | RollupViolation.t()}
   def change_visibility({_kind, _account} = subject, id, attrs, opts \\ []) when is_integer(id) and is_map(attrs) do
-    with {:ok, decision} <- Mediate.authorize(subject, :change_visibility, object(id), opts) do
+    with {:ok, decision} <- Mediate.authorize(subject, :change_visibility, resource(id), opts) do
       apply_visibility(id, attrs, decision)
     end
   end
@@ -116,9 +118,9 @@ defmodule Example.Application.Repositories do
   def apply_visibility(id, attrs, %Decision{} = decision) when is_integer(id) and is_map(attrs) do
     Repo.transaction(fn ->
       with {:ok, repository} <- fetch(id, decision),
-           {:ok, change} <- visibility_change(repository, attrs) do
+           {:ok, change} <- visibility_changeset(repository, attrs) do
         change
-        |> Repo.update!(mediate: decision)
+        |> Repo.update!(authorized_by: decision)
         |> Map.fetch!(:visibility)
       else
         {:error, reason} -> Repo.rollback(reason)
@@ -127,22 +129,22 @@ defmodule Example.Application.Repositories do
   end
 
   @doc """
-  The change of a loaded repository that applies a visibility to its rollup. It
-  is an error when the rollup admits a subject a directory denies (C4). The
-  caller writes it under a decision that carries the repository.
+  The changeset of a loaded repository that applies a visibility to its
+  rollup. It is an error when the rollup admits a subject a directory denies
+  (C4). The caller writes it under a decision that carries the repository.
   """
-  @spec visibility_change(Repository.t(), map()) :: {:ok, Changeset.t()} | {:error, RollupViolation.t()}
-  def visibility_change(%Repository{visibility: %Visibility{} = visibility} = repository, attrs) when is_map(attrs) do
-    with :ok <- covered(repository.id, attrs) do
+  @spec visibility_changeset(Repository.t(), map()) :: {:ok, Changeset.t()} | {:error, RollupViolation.t()}
+  def visibility_changeset(%Repository{visibility: %Visibility{} = visibility} = repository, attrs) when is_map(attrs) do
+    with :ok <- included(repository.id, attrs) do
       {:ok, Changeset.put_assoc(Changeset.change(repository), :visibility, Visibility.changeset(visibility, attrs))}
     end
   end
 
-  @doc "A repository with its visibility, under a mediation that admits it, or `{:error, :not_found}` for no row."
+  @doc "A repository with its visibility, under a decision or an exemption that admits it, or `{:error, :not_found}` for no row."
   @spec fetch(integer(), Decision.t() | {:exempt, String.t()}) :: {:ok, Repository.t()} | {:error, :not_found}
-  def fetch(id, mediation) when is_integer(id) do
-    case Repo.get(Repository, id, mediate: mediation) do
-      %Repository{} = repository -> {:ok, Repo.preload(repository, :visibility, mediate: mediation)}
+  def fetch(id, authorized_by) when is_integer(id) do
+    case Repo.get(Repository, id, authorized_by: authorized_by) do
+      %Repository{} = repository -> {:ok, Repo.preload(repository, :visibility, authorized_by: authorized_by)}
       nil -> {:error, :not_found}
     end
   end
@@ -151,19 +153,21 @@ defmodule Example.Application.Repositories do
   @spec set_embargo(Mediate.subject(), integer(), DateTime.t(), keyword()) ::
           {:ok, Repository.t()} | {:error, refusal()}
   def set_embargo({_kind, _account} = subject, id, %DateTime{} = at, opts \\ []) when is_integer(id) do
-    with {:ok, decision} <- Mediate.authorize(subject, :set_embargo, object(id), opts),
+    with {:ok, decision} <- Mediate.authorize(subject, :set_embargo, resource(id), opts),
          {:ok, repository} <- fetch(id, decision) do
-      {:ok, Repo.update!(Changeset.change(repository, embargo: DateTime.truncate(at, :second)), mediate: decision)}
+      {:ok, Repo.update!(Changeset.change(repository, embargo: DateTime.truncate(at, :second)), authorized_by: decision)}
     end
   end
 
-  @doc "Decontrol a repository now, by the port's clock (C5, C7, C8)."
+  @doc "Lift a repository's embargo now, by Mediate's clock (C5, C7, C8)."
   @spec lift_embargo(Mediate.subject(), integer(), keyword()) :: {:ok, Repository.t()} | {:error, refusal()}
   def lift_embargo({_kind, _account} = subject, id, opts \\ []) when is_integer(id) do
-    with {:ok, decision} <- Mediate.authorize(subject, :lift_embargo, object(id), opts),
+    with {:ok, decision} <- Mediate.authorize(subject, :lift_embargo, resource(id), opts),
          {:ok, repository} <- fetch(id, decision) do
       {:ok,
-       Repo.update!(Changeset.change(repository, embargo: DateTime.truncate(decision.at, :second)), mediate: decision)}
+       Repo.update!(Changeset.change(repository, embargo: DateTime.truncate(decision.decided_at, :second)),
+         authorized_by: decision
+       )}
     end
   end
 
@@ -176,11 +180,11 @@ defmodule Example.Application.Repositories do
   def change_directory_visibility({_kind, _account} = subject, directory_id, attrs, opts \\ [])
       when is_integer(directory_id) and is_map(attrs) do
     with {:ok, directory_decision} <-
-           Mediate.authorize(subject, :change_visibility, object(:directory, directory_id), opts),
+           Mediate.authorize(subject, :change_visibility, resource(:directory, directory_id), opts),
          {:ok, directory} <- fetch_directory(directory_id, directory_decision),
-         {:ok, decision} <- Mediate.authorize(subject, :change_visibility, object(directory.repository_id), opts) do
+         {:ok, decision} <- Mediate.authorize(subject, :change_visibility, resource(directory.repository_id), opts) do
       Repo.transaction(fn ->
-        updated = Repo.update!(Directory.changeset(directory, attrs), mediate: directory_decision)
+        updated = Repo.update!(Directory.changeset(directory, attrs), authorized_by: directory_decision)
         :ok = recompute_rollup(directory.repository_id, decision)
         updated
       end)
@@ -190,42 +194,42 @@ defmodule Example.Application.Repositories do
   @doc """
   The audited override (C10): a privileged account that holds the override
   permission reads a repository outside C1 with a justification. The read
-  emits its own event, and the context reports it to the owning team.
-  Nothing else is reachable through it.
+  emits the override event, and the application module leaves an override
+  report for the owning team. Nothing else is reachable through it.
   """
   @spec override_read(Mediate.subject(), integer(), String.t(), keyword()) ::
           {:ok, Repository.t()} | {:error, OverrideRefused.t() | :not_found}
   def override_read({kind, account} = subject, id, justification, opts \\ []) when is_integer(id) and is_list(opts) do
     with :ok <- override_permitted(subject, justification),
          {:ok, repository} <- fetch(id, @override) do
-      operation_id = Keyword.get_lazy(opts, :operation_id, &Mediate.Id.new/0)
-      report = report_override(repository, subject, justification, operation_id)
+      correlation_id = Keyword.get_lazy(opts, :correlation_id, &Mediate.Id.new/0)
+      report = report_override(repository, subject, justification, correlation_id)
       subject_ref = %{type: Atom.to_string(kind), id: account}
       :telemetry.execute(@override_event, %{}, %{subject: subject_ref, report: report})
       {:ok, repository}
     end
   end
 
-  @doc "The overrides reported to a team, oldest first."
+  @doc "The override reports of a team, oldest first."
   @spec override_reports(integer()) :: [OverrideReport.t()]
   def override_reports(team_id) when is_integer(team_id) do
-    Repo.all(RepositoryQuery.reports(team_id))
+    Repo.all(RepositoryQuery.override_reports(team_id))
   end
 
-  @doc "The object reference for a repository id."
-  @spec object(integer()) :: Mediate.object()
-  def object(id) when is_integer(id), do: {:repository, id}
+  @doc "The resource for a repository id."
+  @spec resource(integer()) :: Mediate.resource()
+  def resource(id) when is_integer(id), do: {:repository, id}
 
-  @doc "The object reference for a row of a type."
-  @spec object(atom(), integer()) :: Mediate.object()
-  def object(type, id) when is_atom(type) and is_integer(id), do: {type, id}
+  @doc "The resource for a row of a type."
+  @spec resource(atom(), integer()) :: Mediate.resource()
+  def resource(type, id) when is_atom(type) and is_integer(id), do: {type, id}
 
-  defp covered(repository_id, attrs) do
-    directories = Repo.all(RepositoryQuery.directories(repository_id), mediate: @rollup)
+  defp included(repository_id, attrs) do
+    directories = Repo.all(RepositoryQuery.directories(repository_id), authorized_by: @rollup)
     rollup = Rollup.visibility(attrs)
     required = Rollup.of(directories)
 
-    if Rollup.covers?(rollup, required) do
+    if Rollup.includes?(rollup, required) do
       :ok
     else
       {:error, %RollupViolation{repository_id: repository_id, rollup: rollup, directories: required}}
@@ -237,10 +241,10 @@ defmodule Example.Application.Repositories do
   # stand where no directory is stricter.
   defp recompute_rollup(repository_id, decision) do
     {:ok, %Repository{visibility: visibility} = repository} = fetch(repository_id, decision)
-    directories = Repo.all(RepositoryQuery.directories(repository_id), mediate: @rollup)
+    directories = Repo.all(RepositoryQuery.directories(repository_id), authorized_by: @rollup)
     rollup = Rollup.of([visibility | directories])
     change = Changeset.put_assoc(Changeset.change(repository), :visibility, Visibility.changeset(visibility, rollup))
-    _repository = Repo.update!(change, mediate: decision)
+    _repository = Repo.update!(change, authorized_by: decision)
     :ok
   end
 
@@ -258,29 +262,29 @@ defmodule Example.Application.Repositories do
       else: {:error, %OverrideRefused{reason: :no_permission}}
   end
 
-  defp report_override(%Repository{} = repository, {_kind, user_id}, justification, operation_id) do
+  defp report_override(%Repository{} = repository, {_kind, account_id}, justification, correlation_id) do
     Repo.insert!(%OverrideReport{
       repository_id: repository.id,
       team_id: repository.owning_team_id,
-      user_id: user_id,
+      account_id: account_id,
       justification: justification,
-      operation_id: operation_id,
-      at: now()
+      correlation_id: correlation_id,
+      read_at: now()
     })
   end
 
   defp directories(%Repository{id: id}, subject, opts) do
-    case Mediate.scope(subject, :read, :directory, opts) do
-      {_rule, %Decision{verdict: :deny}} ->
+    case Mediate.filter(subject, :read, :directory, opts) do
+      {_rule, %Decision{effect: :deny}} ->
         []
 
       {rule, decision} ->
-        Repo.all(RepositoryQuery.directories(id, rule), mediate: decision)
+        Repo.all(RepositoryQuery.directories(id, rule), authorized_by: decision)
     end
   end
 
   defp fetch_directory(directory_id, decision) do
-    case Repo.get(Directory, directory_id, mediate: decision) do
+    case Repo.get(Directory, directory_id, authorized_by: decision) do
       %Directory{} = directory -> {:ok, directory}
       nil -> {:error, :not_found}
     end

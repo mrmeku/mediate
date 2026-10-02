@@ -43,9 +43,9 @@ defmodule Mediate.Dev.PackageTest do
              Package.check(@umbrella, built(mediate_cerbos: %{"files" => ["mix.exs"]}))
 
     built = built()
-    File.write!(Path.join(built[:mediate_fga], "LICENSE"), "something else")
+    File.write!(Path.join(built[:mediate_openfga], "LICENSE"), "something else")
 
-    assert ["mediate_fga carries a LICENSE that is not the one at the repository root"] =
+    assert ["mediate_openfga carries a LICENSE that is not the one at the repository root"] =
              Package.check(@umbrella, built)
   end
 

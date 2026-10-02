@@ -5,10 +5,10 @@ defmodule Mediate.Domain.ConfigSchema do
   # field means. `Mediate.Config` builds the struct from what this validates.
 
   @schema NimbleOptions.new!(
-            adapter: [
+            engine: [
               type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
               required: true,
-              doc: "The module implementing `Mediate.Adapter`, bare or with its options."
+              doc: "The module implementing `Mediate.Engine`, bare or with its options."
             ],
             clock: [
               type: {:fun, 0},
@@ -16,9 +16,9 @@ defmodule Mediate.Domain.ConfigSchema do
             ],
             caps: [
               type: :keyword_list,
-              default: [policy_content_bytes: 65_536],
+              default: [policy_text_bytes: 65_536],
               keys: [
-                policy_content_bytes: [type: :pos_integer, default: 65_536, doc: "Policy text kept by value."]
+                policy_text_bytes: [type: :pos_integer, default: 65_536, doc: "Policy text kept by value."]
               ],
               doc: "The caps on what a record carries by value."
             ]

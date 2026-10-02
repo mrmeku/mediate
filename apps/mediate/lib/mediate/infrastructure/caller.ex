@@ -2,17 +2,18 @@ defmodule Mediate.Infrastructure.Caller do
   @moduledoc false
   # The module that called the Repo, read from the stack of the process
   # that made the call. It is the first frame that belongs neither to the
-  # Repo, nor to the seam, nor to Ecto and the libraries beneath it. The
-  # seam records a declared exemption against it. The seam accepts a
-  # library exemption only when it is a `Mediate.*` module.
+  # Repo, nor to the mediated repo's own modules, nor to Ecto and the
+  # libraries beneath it. The mediated repo records a declared exemption
+  # against it. It accepts a library exemption only when it is a
+  # `Mediate.*` module.
 
   @skipped_prefixes ~w(Elixir.Ecto. Elixir.DBConnection Elixir.Postgrex) ++
                       ~w(Elixir.Enum Elixir.Stream Elixir.Task Elixir.Agent Elixir.GenServer Elixir.Process Elixir.Kernel)
-  # The seam's own modules by name, so this file depends on none of them.
-  @seam Enum.map(
-          ~w(Repo Facts Domain.Matching Domain.Mediation Domain.Source Infrastructure.Caller Infrastructure.Option Infrastructure.Seam),
-          &("Elixir.Mediate." <> &1)
-        )
+  # The mediated repo's own modules by name, so this file depends on none of them.
+  @mediated Enum.map(
+              ~w(Repo Domain.Matching Domain.Mediation Domain.Source Infrastructure.Caller Infrastructure.Option Infrastructure.Enforcement),
+              &("Elixir.Mediate." <> &1)
+            )
 
   @doc "The module that made the call, or `:any` when no frame qualifies."
   @spec module(repo :: module()) :: module() | :any
@@ -37,7 +38,7 @@ defmodule Mediate.Infrastructure.Caller do
   defp skipped?(module, repo) do
     name = Atom.to_string(module)
 
-    module == repo or name in @seam or
+    module == repo or name in @mediated or
       not String.starts_with?(name, "Elixir.") or
       Enum.any?(@skipped_prefixes, &String.starts_with?(name, &1))
   end

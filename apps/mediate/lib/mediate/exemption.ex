@@ -1,21 +1,22 @@
 defmodule Mediate.Exemption do
   @moduledoc """
-  A named, logged opt-out from mediation, per call. `:declared` carries the
-  caller's reason. `:library` marks the seam's own writes, and the seam
-  accepts it only from a `Mediate.*` module.
+  A named, logged opt-out from mediation, per call. One the caller declared
+  carries the caller's justification. One the library declared marks the
+  mediated repo's own writes, and the repo accepts it only from a
+  `Mediate.*` module.
   """
 
-  @enforce_keys [:on, :caller, :reason, :kind]
+  @enforce_keys [:source, :caller, :justification, :declared_by]
   defstruct @enforce_keys
 
-  @typedoc "Who declared the opt-out: the caller, or the seam itself."
-  @type kind :: :declared | :library
+  @typedoc "Who declared the opt-out: the caller, or the library itself."
+  @type declared_by :: :caller | :library
 
-  @typedoc "`on` is the root source: a schema module, a table name, or `nil` for raw SQL."
+  @typedoc "`source` is the root source: a schema module, a table name, or `nil` for raw SQL."
   @type t :: %__MODULE__{
-          on: module() | String.t() | nil,
+          source: module() | String.t() | nil,
           caller: module() | :any,
-          reason: String.t(),
-          kind: kind()
+          justification: String.t(),
+          declared_by: declared_by()
         }
 end

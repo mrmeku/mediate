@@ -16,11 +16,11 @@ defmodule Example.Application.ProposalsTest do
     {:ok, repository: Fixture.repository!(world)}
   end
 
-  test "propose needs the repository's operation and records a pending proposal", ctx do
-    assert {:error, %Error{detail: "user dana may not propose_visibility" <> _rest}} =
+  test "propose needs the repository's action and records a pending proposal", ctx do
+    assert {:error, %Error{message: "user dana may not propose_visibility" <> _rest}} =
              Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
 
-    allow(ctx.rules, "dana", :propose_visibility, {:repository, ctx.repository.id})
+    allow(ctx.fake, "dana", :propose_visibility, {:repository, ctx.repository.id})
 
     assert {:ok, %Proposal{status: :pending, proposer_id: "dana", restrictions: [:export_controlled]}} =
              Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
@@ -28,19 +28,22 @@ defmodule Example.Application.ProposalsTest do
     assert {:ok, %Proposal{}} = Proposals.propose(@dana, ctx.repository.id, %{"restrictions" => ["employees_only"]})
   end
 
-  test "approve needs the proposal's operation, applies the visibility, and closes the proposal", ctx do
-    allow(ctx.rules, "dana", :propose_visibility, {:repository, ctx.repository.id})
+  test "approve needs the proposal's action, applies the visibility, and closes the proposal", ctx do
+    allow(ctx.fake, "dana", :propose_visibility, {:repository, ctx.repository.id})
     {:ok, proposal} = Proposals.propose(@dana, ctx.repository.id, %{restrictions: [:export_controlled]})
-    assert {:error, %Error{detail: "user eve may not approve_visibility" <> _rest}} = Proposals.approve(@eve, proposal.id)
-    allow(ctx.rules, "eve", :approve_visibility, {:proposal, proposal.id})
+
+    assert {:error, %Error{message: "user eve may not approve_visibility" <> _rest}} =
+             Proposals.approve(@eve, proposal.id)
+
+    allow(ctx.fake, "eve", :approve_visibility, {:proposal, proposal.id})
     assert {:ok, %Proposal{status: :approved, reviewer_id: "eve"}} = Proposals.approve(@eve, proposal.id)
     assert {:error, :not_found} = Proposals.approve(@eve, proposal.id)
-    allow(ctx.rules, "eve", :read, {:repository, ctx.repository.id})
+    allow(ctx.fake, "eve", :read, {:repository, ctx.repository.id})
 
     assert {:ok, %{visibility: %Visibility{restrictions: [:export_controlled]}}} =
              Repositories.read(@eve, ctx.repository.id)
 
-    allow(ctx.rules, "eve", :approve_visibility, {:proposal, :any})
+    allow(ctx.fake, "eve", :approve_visibility, {:proposal, :any})
     assert {:error, :not_found} = Proposals.approve(@eve, proposal.id + 1000)
   end
 
@@ -50,12 +53,12 @@ defmodule Example.Application.ProposalsTest do
         directories: [%{name: "export", contents: "export", restrictions: [:export_controlled]}]
       )
 
-    allow(ctx.rules, "dana", :propose_visibility, {:repository, repository.id})
+    allow(ctx.fake, "dana", :propose_visibility, {:repository, repository.id})
     {:ok, proposal} = Proposals.propose(@dana, repository.id, %{restrictions: []})
-    allow(ctx.rules, "eve", :approve_visibility, {:proposal, proposal.id})
+    allow(ctx.fake, "eve", :approve_visibility, {:proposal, proposal.id})
     assert {:error, %Repositories.RollupViolation{}} = Proposals.approve(@eve, proposal.id)
 
     assert %Proposal{status: :pending} =
-             Repo.get(Proposal, proposal.id, mediate: Fixture.exemption())
+             Repo.get(Proposal, proposal.id, authorized_by: Fixture.exemption())
   end
 end

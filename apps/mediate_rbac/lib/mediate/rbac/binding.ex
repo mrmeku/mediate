@@ -5,8 +5,8 @@ defmodule Mediate.Rbac.Binding do
   and keeps it for the life of the VM, as `Mediate.Config.boot!/1` keeps
   the configuration. `override/1` puts a binding in the current process for
   the rest of its life. `resolve/0` reads it from the caller and from its
-  `$callers` chain. So a test binds its own policy and repo and leaves the
-  boot binding alone.
+  `$callers` chain. So a test binds its own policy module and repo and
+  leaves the boot binding alone.
   """
 
   alias Mediate.Error
@@ -44,7 +44,7 @@ defmodule Mediate.Rbac.Binding do
     end
   end
 
-  @doc "`bind/1`, but raises the error."
+  @doc "`bind/1`, and it raises the error."
   @spec bind!(keyword()) :: t()
   def bind!(options) when is_list(options) do
     case bind(options) do
@@ -80,9 +80,14 @@ defmodule Mediate.Rbac.Binding do
     overrides = overrides()
 
     case :persistent_term.get(__MODULE__, nil) do
-      %__MODULE__{} = base -> new(Keyword.merge(to_keyword(base), overrides))
-      nil when overrides == [] -> {:error, invalid("nothing bound and no override")}
-      nil -> new(overrides)
+      %__MODULE__{} = base ->
+        new(Keyword.merge(to_keyword(base), overrides))
+
+      nil when overrides == [] ->
+        {:error, invalid("nothing bound and no override; call Mediate.Rbac.Binding.bind!/1 at boot")}
+
+      nil ->
+        new(overrides)
     end
   end
 
@@ -98,14 +103,14 @@ defmodule Mediate.Rbac.Binding do
   end
 
   defp policy?(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :__mediate_code__, 1) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :__mediate_policy__, 1) do
       :ok
     else
-      {:error, invalid("#{inspect(module)} did not use Mediate.Rbac.Policy")}
+      {:error, invalid("#{inspect(module)} is not a policy module; a policy module has `use Mediate.Rbac.Policy`")}
     end
   end
 
-  defp invalid(detail), do: Error.invalid(:binding, detail)
+  defp invalid(text), do: Error.invalid(:binding, text)
 
   defp overrides do
     [self() | List.wrap(Process.get(:"$callers", []))]

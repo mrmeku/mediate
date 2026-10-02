@@ -1,42 +1,42 @@
 defmodule Mediate.Decision do
-  @moduledoc "The stamped answer: what the port said, when, from what state, under which rules. It is the value the seam accepts under `mediate:`."
+  @moduledoc "The stamped verdict: what the library said, when, from what state, under which policy. It is the value the mediated repo accepts under `authorized_by:`."
 
-  alias Mediate.Answer
+  alias Mediate.Verdict
 
-  @verdicts [:allow, :deny, :scoped]
+  @effects [:allow, :deny, :filter]
 
   @enforce_keys [
     :id,
     :subject,
-    :object,
-    :operation,
-    :verdict,
+    :resource,
+    :action,
+    :effect,
     :reason,
-    :adapter,
+    :engine,
     :policy_version,
-    :operation_id,
-    :at
+    :correlation_id,
+    :decided_at
   ]
   defstruct @enforce_keys
 
-  @typedoc "`:scoped` is the verdict of a `scope` decision, whose rule narrows rather than allows."
-  @type verdict :: :allow | :deny | :scoped
+  @typedoc "`:filter` is the effect of a `filter` decision, whose rule narrows rather than allows."
+  @type effect :: :allow | :deny | :filter
 
-  @typedoc "`policy_version` is `nil` where the adapter names no version for the answer."
+  @typedoc "`policy_version` is `nil` where the engine names no version for the verdict."
   @type t :: %__MODULE__{
           id: Mediate.Id.t(),
           subject: Mediate.subject(),
-          object: Mediate.object(),
-          operation: atom(),
-          verdict: verdict(),
-          reason: Answer.reason(),
-          adapter: module(),
-          policy_version: Mediate.PolicyVersion.ref() | nil,
-          operation_id: Mediate.Id.t(),
-          at: DateTime.t()
+          resource: Mediate.resource(),
+          action: atom(),
+          effect: effect(),
+          reason: Verdict.reason(),
+          engine: module(),
+          policy_version: Mediate.PolicyRelease.policy_version() | nil,
+          correlation_id: Mediate.Id.t(),
+          decided_at: DateTime.t()
         }
 
-  @doc "The three verdicts."
-  @spec verdicts() :: [verdict()]
-  def verdicts, do: @verdicts
+  @doc "The three effects."
+  @spec effects() :: [effect()]
+  def effects, do: @effects
 end

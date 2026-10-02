@@ -1,20 +1,20 @@
 defmodule Mediate.Domain.Matching do
   @moduledoc false
-  # The seam applies three rules to one query:
+  # The mediated repo applies three rules to one query:
   #
   # 1. The root source decides the query. A protected root needs a decision
-  #    that names its object type, a carried admission, or an exemption.
+  #    that names its resource type, a covered admission, or an exemption.
   # 2. A preload or association query is a query of its own, with the
   #    association's schema as root. It passes when the parent's decision
-  #    carries the association.
+  #    covers the association.
   # 3. Every other protected source in the query, a joined schema or a
   #    subquery's root, must pass the same way.
   #
-  # A protected schema is one that declares an object type. A source
+  # A protected schema is one that declares a resource type. A source
   # without a schema, a table name or a fragment, passes without a check.
   #
   # A refusal names the module that made the call. Only the running process
-  # knows that module, so the caller arrives as a function the seam
+  # knows that module, so the caller arrives as a function the repo
   # supplies. A judgement that passes never calls it.
 
   alias Ecto.Query.JoinExpr
@@ -41,14 +41,14 @@ defmodule Mediate.Domain.Matching do
   @doc "Whether a schema passes under a mediation."
   @spec admitted?(module() | nil, Mediation.t() | nil) :: boolean()
   def admitted?(schema, mediation) do
-    case Schema.object_type_of(schema) do
+    case Schema.resource_type_of(schema) do
       nil -> true
-      type -> Mediation.exempt?(mediation) or Mediation.object_type(mediation) == type or schema in carried(mediation)
+      type -> Mediation.exempt?(mediation) or Mediation.resource_type(mediation) == type or schema in covered(mediation)
     end
   end
 
-  defp carried(%Mediation{carried: carried}), do: carried
-  defp carried(nil), do: []
+  defp covered(%Mediation{covered: covered}), do: covered
+  defp covered(nil), do: []
 
   defp admit_source({_table, schema}, mediation, caller) do
     :ok = admit(schema, mediation, caller)
@@ -92,11 +92,11 @@ defmodule Mediate.Domain.Matching do
   defp refuse(schema, mediation, caller) do
     {name, arity} = call(mediation)
 
-    raise Mediation.unmediated(
+    raise Mediation.decision_missing(
             function: name,
             arity: arity,
             schema: schema,
-            object_type: Mediation.object_type(mediation),
+            resource_type: Mediation.resource_type(mediation),
             caller: caller.()
           )
   end

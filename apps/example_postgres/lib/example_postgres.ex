@@ -1,67 +1,38 @@
 defmodule ExamplePostgres do
   @moduledoc """
-  The example bound to row-level security. Nothing of the domain lives here.
+  The example under row-level security. Nothing of the domain lives here.
 
-  The package holds three things:
+  The deployment holds three things:
 
-  - `ExamplePostgres.Infrastructure.Policies`, the SQL that states the
-    example's rules as Postgres policies
-  - the migrations, which reassign the protected tables to the owner role
-    and write those policies
+  - `ExamplePostgres.Infrastructure.Policy`, the example's clauses as the
+    expressions the rules are written from
+  - the migrations, which reassign the protected tables to the owner role,
+    write the rules and release the policy
   - `ExamplePostgres.Application`, the boot that binds the example's schemas
     to `Example.Infrastructure.Repo`
 
-  `Mediate.Postgres.Version` says what a policy version is. The rules
-  migration publishes one from the policies it wrote, and `publish/0`
-  publishes the same version from the loaded catalog at boot.
+  `Mediate.Postgres.Version` says what a policy version is. The policy
+  migration releases one from the rules it wrote, in its own transaction, so
+  there is no release at the boot.
   """
 
   use Boundary,
     deps: [Example, Mediate, Mediate.Postgres, Ecto],
-    exports: [Application, Infrastructure.Policies]
+    exports: [Application, Infrastructure.Policy]
 
-  alias Mediate.Config
-  alias Mediate.Postgres.Catalog
-  alias Mediate.Postgres.Version
+  @author "the Mediate maintainers"
+  @approval "the thirteen clauses of docs/example.md"
+  @policy_text_bytes 65_536
 
-  @author "example_postgres"
-  @approval "the migration under review"
-  @content_bytes 65_536
-
-  @doc "Who wrote the rules, as the record of a policy version carries it."
+  @doc "Who wrote the policy, as the policy release carries it."
   @spec author() :: String.t()
   def author, do: @author
 
-  @doc "What approved them, as the record of a policy version carries it."
+  @doc "What approved it, as the policy release carries it."
   @spec approval() :: String.t()
   def approval, do: @approval
 
-  @doc """
-  Emits the version the database is at, from the policies the loaded catalog
-  holds.
-  """
-  @spec publish() :: {:ok, Mediate.PolicyVersion.t()}
-  def publish do
-    %Catalog{} = catalog = Mediate.Postgres.load!()
-    {:ok, config} = Config.resolve()
-    fields = [at: config.clock.()] ++ published(catalog.version)
-
-    Version.publish(Version.of(Mediate.Postgres, catalog.policies, fields))
-  end
-
-  @doc """
-  The fields a published version carries beside its policies and its moment.
-  The caller supplies the moment. The boot supplies the configured clock. The
-  rules migration takes the default of `Mediate.Postgres.Migration.publish!/2`,
-  because it publishes before there is a configuration to read.
-  """
-  @spec published(String.t()) :: keyword()
-  def published(version) when is_binary(version) do
-    [
-      version: version,
-      author: @author,
-      approval: @approval,
-      content_bytes: @content_bytes
-    ]
-  end
+  @doc "The cap on the policy text a release carries, as the release helper's `policy_text_bytes:`."
+  @spec policy_text_bytes() :: pos_integer()
+  def policy_text_bytes, do: @policy_text_bytes
 end

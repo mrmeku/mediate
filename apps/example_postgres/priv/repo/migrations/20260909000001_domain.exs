@@ -1,4 +1,4 @@
-defmodule ExamplePostgres.Repo.Migrations.Domain do
+defmodule ExamplePostgres.Migrations.Domain do
   @moduledoc false
   use Ecto.Migration
 

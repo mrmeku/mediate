@@ -2,7 +2,7 @@ import Config
 
 # The development database `nix run .#services` raises: one database, the
 # two roles, and the repos, each under the role it connects as. The test
-# environment leaves the repos to the ephemeral cluster and configures none
+# environment leaves the repos to the run's cluster and configures none
 # of this.
 for {repo, role} <- [
       {Example.Infrastructure.Repo, "mediate_app"},

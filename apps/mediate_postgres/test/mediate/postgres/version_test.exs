@@ -1,69 +1,50 @@
 defmodule Mediate.Postgres.VersionTest do
   use ExUnit.Case, async: true
 
-  alias Mediate.PolicyVersion
-  alias Mediate.Postgres.Catalog
-  alias Mediate.Postgres.Policy
+  alias Mediate.PolicyRelease
+  alias Mediate.Postgres.Rule
   alias Mediate.Postgres.Version
 
-  @policies [
-    %Policy{name: "mediate_scope_read", table: "folders", command: :select, using: "true", with_check: nil},
-    %Policy{name: "mediate_gate_edit", table: "folders", command: :update, using: "false", with_check: "false"},
-    %Policy{name: "mediate_scope_read", table: "items", command: :select, using: "true", with_check: nil}
+  @rules [
+    %Rule{name: "mediate_filter_read", table: "folders", command: :select, using: "true", with_check: nil},
+    %Rule{name: "mediate_gate_edit", table: "folders", command: :update, using: "false", with_check: "false"},
+    %Rule{name: "mediate_filter_read", table: "items", command: :select, using: "true", with_check: nil}
   ]
 
-  test "the version is the migration number and carries the policies as text" do
-    at = DateTime.utc_now()
-    version = version(at: at)
+  test "the release names the migration number and carries the rules as text" do
+    released_at = DateTime.utc_now()
+    release = release(released_at: released_at)
 
-    assert %PolicyVersion{adapter: Mediate.Postgres, version: "20260101000001"} = version
-    assert {version.author, version.approval, version.at} == {"mediate_postgres", "the conformance suite", at}
-    assert version.content == Catalog.to_text(@policies)
-    assert version.content_hash =~ ~r/\A[0-9a-f]{64}\z/
-    assert version.pointer == nil
+    assert %PolicyRelease{engine: Mediate.Postgres, policy_version: "20260101000001"} = release
+    assert {release.author, release.approval} == {"mediate_postgres", "the conformance suite"}
+    assert release.released_at == released_at
+    assert release.text == Version.text(@rules)
+    assert release.text_hash == Version.text_hash(@rules)
+    assert release.text_hash =~ ~r/\A[0-9a-f]{64}\z/
+    assert release.text_location == nil
   end
 
-  test "over the content cap the version points at the tables and hashes the text all the same" do
-    version = version(content_bytes: 8)
+  test "over the text cap the release names the tables as its location and hashes the text all the same" do
+    release = release(policy_text_bytes: 8)
 
-    assert version.content == nil
-    assert version.pointer == "policies on folders, items"
-    assert version.content_hash == version().content_hash
+    assert release.text == nil
+    assert release.text_location == "policies on folders, items"
+    assert release.text_hash == release().text_hash
   end
 
-  test "publish emits one event per call, carrying the version" do
-    :telemetry.attach(inspect(self()), Version.telemetry_event(), &__MODULE__.forward/4, self())
-
-    assert {:ok, %PolicyVersion{version: "20260101000001"} = version} = Version.publish(version())
-    assert_receive {:policy_version, %{version: ^version}}
-    refute_receive {:policy_version, _later}
-  after
-    :telemetry.detach(inspect(self()))
+  test "the text reads back through the rule, so the release carries what the database holds" do
+    assert Rule.from_text(Version.text(@rules)) == @rules
   end
 
-  test "a newer migration publishes under its own number" do
-    assert {:ok, %PolicyVersion{version: "20260101000001"}} = Version.publish(version())
-
-    assert {:ok, %PolicyVersion{version: "20260202000002"}} =
-             Version.publish(version(version: 20_260_202_000_002))
-  end
-
-  @doc false
-  @spec forward([atom()], map(), map(), pid()) :: :ok
-  def forward(_event, _measurements, metadata, pid) do
-    send(pid, {:policy_version, metadata})
-    :ok
-  end
-
-  defp version(overrides \\ []) do
+  defp release(overrides \\ []) do
     options = [
-      version: 20_260_101_000_001,
+      policy_version: 20_260_101_000_001,
       author: "mediate_postgres",
       approval: "the conformance suite",
-      at: DateTime.utc_now(),
-      content_bytes: 65_536
+      released_at: DateTime.utc_now(),
+      policy_text_bytes: 65_536
     ]
 
-    Version.of(Mediate.Postgres, @policies, Keyword.merge(options, overrides))
+    Version.release(Mediate.Postgres, @rules, Keyword.merge(options, overrides))
   end
 end

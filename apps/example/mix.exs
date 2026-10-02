@@ -27,7 +27,7 @@ defmodule Example.MixProject do
   end
 
   # A library application, with no callback module and nothing started.
-  # The thin applications start the repos and the consumer of the events.
+  # The deployments start the repos and the consumer of the events.
   def application do
     [extra_applications: [:logger]]
   end
@@ -49,9 +49,9 @@ defmodule Example.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   # Example.Scenarios and the scenario bodies are test support. They run in
-  # the suites of the thin applications, under a real adapter. This
-  # application's own run holds the table to the repository and covers the
-  # contexts against the fake adapter.
+  # the suites of the deployments, under a real engine. This application's
+  # own run holds the table to the document and proves the application
+  # modules against the fake engine.
   defp ignore_modules do
     [~r/^Example\.Scenarios/, ~r/^Example\.Fixture/, ~r/^Example\.Cluster/]
   end

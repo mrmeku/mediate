@@ -14,7 +14,7 @@ defmodule Example.Domain.Project do
     belongs_to(:team, Team)
   end
 
-  object_type(:project)
-  audited(:entity)
-  fact(:archived_at, kind: :object_attribute, object: :id)
+  resource_type(:project)
+  identity(:other)
+  fact(:archived_at, about: :resource, resource: :id)
 end

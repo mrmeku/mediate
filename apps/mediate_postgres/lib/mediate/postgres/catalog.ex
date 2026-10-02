@@ -1,36 +1,34 @@
 defmodule Mediate.Postgres.Catalog do
   @moduledoc """
-  What the database says its own rules are.
+  What the database says its own rules are. `read/1` asks three sources:
 
-  `read!/1` asks three sources:
-
-  - `pg_policy`, for every policy on the bound tables, with the `USING` and
+  - `pg_policy`, for every rule on the bound tables, with the `USING` and
     `WITH CHECK` expressions as `pg_get_expr/2` renders them
-  - `pg_depend`, for the columns those expressions reference
-  - the migrations table, for the highest version, which is the version a
-    decision names
+  - `pg_depend`, for the columns those expressions read
+  - the migration source, for the highest version, which is the policy
+    version a decision names
 
-  `load!/1` reads once per binding and keeps the result for the life of the
-  VM. So no call on the request path pays for a catalog read. The query
-  counts of a mediated call stay what the shape tests expect. An
-  application loads it at boot through `Mediate.Postgres.load!/0`, after
-  the binding. `current!/1` loads on first use for a caller that did not.
-  A migration that runs while the VM is up leaves the kept catalog behind
-  the database, so `reload!/1` reads it again and replaces it.
+  `load/1` reads and keeps the result for the life of the VM, so no call
+  on the request path pays for a catalog read, and the query counts of a
+  mediated call stay what the shape tests expect. An application loads it
+  at boot through `Mediate.Postgres.load_catalog/0`, after the binding,
+  and loads again after a migration that runs under a live VM.
+  `resolve/1` answers the kept catalog, and loads on first use for a
+  caller that did not.
 
   Every statement runs through the bound repo's raw channel under the
-  library exemption, so the seam mediates a catalog read like any other
-  call.
+  library exemption, so the mediated repo sees a catalog read like any
+  other call.
   """
 
   alias Mediate.Error
   alias Mediate.Postgres.Binding
-  alias Mediate.Postgres.Infrastructure.Name
-  alias Mediate.Postgres.Policy
+  alias Mediate.Postgres.Domain.Identifier
+  alias Mediate.Postgres.Rule
 
   @exemption {:exempt, :library}
 
-  @policies """
+  @rules """
   SELECT p.polname, c.relname, p.polcmd::text,
          pg_get_expr(p.polqual, p.polrelid),
          pg_get_expr(p.polwithcheck, p.polrelid)
@@ -40,7 +38,7 @@ defmodule Mediate.Postgres.Catalog do
   ORDER BY c.relname, p.polname
   """
 
-  @columns """
+  @reads """
   SELECT referenced.relname, attribute.attname
   FROM pg_depend dependency
   JOIN pg_policy policy ON dependency.classid = 'pg_policy'::regclass AND dependency.objid = policy.oid
@@ -53,95 +51,105 @@ defmodule Mediate.Postgres.Catalog do
   ORDER BY 1, 2
   """
 
-  @enforce_keys [:version, :policies, :columns]
+  @enforce_keys [:policy_version, :rules, :reads]
   defstruct @enforce_keys
 
-  @typedoc "The version, the policies of the bound tables, and the table and column of every read they make."
-  @type t :: %__MODULE__{version: String.t(), policies: [Policy.t()], columns: [{String.t(), String.t()}]}
+  @typedoc "The policy version, the rules of the bound tables, and the table and column of every read they make."
+  @type t :: %__MODULE__{policy_version: String.t(), rules: [Rule.t()], reads: [{String.t(), String.t()}]}
 
-  @doc "Read the catalog now, whatever a previous call loaded."
-  @spec read!(Binding.t()) :: t()
-  def read!(%Binding{repo: repo} = binding) do
+  @doc """
+  Reads the catalog now, whatever a previous call kept. A migration source
+  that holds no version is an invalid catalog. A statement the driver
+  refuses is an engine failure with the driver's text.
+  """
+  @spec read(Binding.t()) :: {:ok, t()} | {:error, Error.t()}
+  def read(%Binding{repo: repo} = binding) do
     tables = Binding.tables(binding)
 
-    %__MODULE__{
-      version: version!(repo, binding.migrations_table),
-      policies: policies!(repo, tables),
-      columns: Enum.map(rows(repo, @columns, [tables]), &column/1)
-    }
+    with {:ok, policy_version} <- version(repo, binding.migration_source) do
+      {:ok,
+       %__MODULE__{
+         policy_version: policy_version,
+         rules: rules(repo, tables),
+         reads: Enum.map(rows(repo, @reads, [tables]), &read_of/1)
+       }}
+    end
+  rescue
+    error in Error -> {:error, error}
+    error -> {:error, %Error{reason: :engine_failed, message: "catalog read failed: " <> Exception.message(error)}}
   end
 
-  @doc "The policies on those tables, as `pg_policy` holds them, for a caller with no binding yet."
-  @spec policies!(module(), [String.t()]) :: [Policy.t()]
-  def policies!(repo, tables) when is_atom(repo) and is_list(tables) do
-    Enum.map(rows(repo, @policies, [tables]), &policy/1)
-  end
-
-  @doc "Read the catalog once for this binding and keep it. A second call reads nothing."
-  @spec load!(Binding.t()) :: t()
-  def load!(%Binding{} = binding) do
-    case :persistent_term.get({__MODULE__, binding}, nil) do
-      %__MODULE__{} = loaded ->
-        loaded
-
-      nil ->
-        catalog = read!(binding)
-        :persistent_term.put({__MODULE__, binding}, catalog)
-        catalog
+  @doc "Reads the catalog and keeps it for this binding. Every call after it answers what the database held now."
+  @spec load(Binding.t()) :: {:ok, t()} | {:error, Error.t()}
+  def load(%Binding{} = binding) do
+    with {:ok, %__MODULE__{} = catalog} <- read(binding) do
+      :persistent_term.put({__MODULE__, binding}, catalog)
+      {:ok, catalog}
     end
   end
 
-  @doc """
-  Read the catalog again and keep what it says now. A migration that runs
-  after boot changes the policies and the version under a loaded catalog.
-  Every call after the reload reads the ones the database now holds.
-  """
-  @spec reload!(Binding.t()) :: t()
-  def reload!(%Binding{} = binding) do
-    catalog = read!(binding)
-    :persistent_term.put({__MODULE__, binding}, catalog)
-    catalog
+  @doc "`load/1`, and it raises the error."
+  @spec load!(Binding.t()) :: t()
+  def load!(%Binding{} = binding) do
+    case load(binding) do
+      {:ok, catalog} -> catalog
+      {:error, error} -> raise error
+    end
   end
 
-  @doc "The loaded catalog. A first call loads it."
-  @spec current!(Binding.t()) :: t()
-  def current!(%Binding{} = binding), do: load!(binding)
-
-  @doc "The scope policy of an operation on a table, or `nil`."
-  @spec scope(t(), String.t(), atom()) :: Policy.t() | nil
-  def scope(%__MODULE__{} = catalog, table, operation) do
-    named(catalog, table, Policy.scope_name(Atom.to_string(operation)))
+  @doc "The kept catalog. A first call loads it."
+  @spec resolve(Binding.t()) :: {:ok, t()} | {:error, Error.t()}
+  def resolve(%Binding{} = binding) do
+    case :persistent_term.get({__MODULE__, binding}, nil) do
+      %__MODULE__{} = kept -> {:ok, kept}
+      nil -> load(binding)
+    end
   end
 
-  @doc "The gate policy of an operation on a table, or `nil`."
-  @spec gate(t(), String.t(), atom()) :: Policy.t() | nil
-  def gate(%__MODULE__{} = catalog, table, operation) do
-    named(catalog, table, Policy.gate_name(Atom.to_string(operation)))
+  @doc "The rules on those tables, as `pg_policy` holds them, for a caller with no binding."
+  @spec rules(module(), [String.t()]) :: [Rule.t()]
+  def rules(repo, tables) when is_atom(repo) and is_list(tables) do
+    Enum.map(rows(repo, @rules, [tables]), &rule/1)
   end
 
-  @doc "The policies as the text a policy version carries."
-  @spec to_text([Policy.t()]) :: String.t()
-  def to_text(policies) when is_list(policies), do: Enum.map_join(policies, "", &Policy.to_text/1)
-
-  defp named(%__MODULE__{policies: policies}, table, name) do
-    Enum.find(policies, &(&1.table == table and &1.name == name))
+  @doc "The filter rule of an action on a table, or `nil`."
+  @spec filter_rule(t(), String.t(), atom()) :: Rule.t() | nil
+  def filter_rule(%__MODULE__{} = catalog, table, action) when is_atom(action) do
+    named(catalog, table, Rule.filter_name(Atom.to_string(action)))
   end
 
-  defp policy([name, table, command, using, with_check]) do
-    %Policy{name: name, table: table, command: Policy.command(command), using: using, with_check: with_check}
+  @doc "The gate rule of an action on a table, or `nil`."
+  @spec gate_rule(t(), String.t(), atom()) :: Rule.t() | nil
+  def gate_rule(%__MODULE__{} = catalog, table, action) when is_atom(action) do
+    named(catalog, table, Rule.gate_name(Atom.to_string(action)))
   end
 
-  defp column([table, name]), do: {table, name}
+  defp named(%__MODULE__{rules: rules}, table, name) do
+    Enum.find(rules, &(&1.table == table and &1.name == name))
+  end
 
-  defp version!(repo, table) do
-    case rows(repo, "SELECT max(version)::text FROM #{Name.check!(table, :migrations_table)}", []) do
-      [[version]] when is_binary(version) -> version
-      _empty -> raise Error.invalid(:catalog, "#{table} holds no migration version")
+  defp rule([name, table, command, using, with_check]) do
+    %Rule{name: name, table: table, command: Rule.command(command), using: using, with_check: with_check}
+  end
+
+  defp read_of([table, column]), do: {table, column}
+
+  defp version(repo, source) do
+    case rows(repo, "SELECT max(version)::text FROM #{Identifier.check!(source, :migration_source)}", []) do
+      [[version]] when is_binary(version) ->
+        {:ok, version}
+
+      _empty ->
+        {:error,
+         Error.invalid(
+           :catalog,
+           "#{source} holds no migration version; run the migrations before Mediate.Postgres.load_catalog/0"
+         )}
     end
   end
 
   defp rows(repo, statement, params) do
-    %{rows: rows} = repo.query!(statement, params, mediate: @exemption)
+    %{rows: rows} = repo.query!(statement, params, authorized_by: @exemption)
     rows
   end
 end

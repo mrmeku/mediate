@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - run: |
           expected="${TAG#v}"
-          for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_fga; do
+          for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_openfga; do
             found=$(grep -o '@version "[^"]*"' "apps/$app/mix.exs" | head -1 | cut -d'"' -f2)
             if [ "$found" != "$expected" ]; then
               echo "$app is at $found and the tag says $expected"
@@ -40,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [example, example_rbac, example_postgres, example_cerbos, example_fga]
+        app: [example, example_rbac, example_postgres, example_cerbos, example_openfga]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: DeterminateSystems/nix-installer-action@v22
@@ -77,7 +77,7 @@ jobs:
             unset MEDIATE_UMBRELLA
             version="${TAG#v}"
 
-            for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_fga; do
+            for app in mediate mediate_conformance mediate_credo mediate_rbac mediate_postgres mediate_cerbos mediate_openfga; do
               if curl -fsS -o /dev/null "https://hex.pm/api/packages/$app/releases/$version"; then
                 echo "$app $version is on Hex already"
                 continue

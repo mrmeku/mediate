@@ -18,20 +18,20 @@ defmodule Mediate.Postgres.BindingTest do
     end
   end
 
-  test "the binding names the repo, the schemas, and the table the version is read from" do
+  test "the binding names the repo, the schemas, and the migration source the version is read from" do
     assert {:ok, binding} = Binding.new(repo: Sandboxed, schemas: [Folder])
-    assert {binding.repo, binding.schemas, binding.migrations_table} == {Sandboxed, [Folder], "schema_migrations"}
+    assert {binding.repo, binding.schemas, binding.migration_source} == {Sandboxed, [Folder], "schema_migrations"}
   end
 
-  test "a schema that did not use Mediate.Schema is refused by name" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid binding: " <> detail}} =
+  test "a schema that did not use Mediate.Schema is refused by name, with the fix" do
+    assert {:error, %Error{reason: :invalid, message: "invalid binding: schemas: " <> rest}} =
              Binding.new(repo: Sandboxed, schemas: [Folder, Undeclared])
 
-    assert detail =~ "Undeclared"
+    assert rest =~ "Undeclared did not use Mediate.Schema; add use Mediate.Schema"
   end
 
   test "a missing repo is refused" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid binding: " <> _rest}} = Binding.new(schemas: [Folder])
+    assert {:error, %Error{reason: :invalid, message: "invalid binding: " <> _rest}} = Binding.new(schemas: [Folder])
   end
 
   test "an override is read from the calling process and from its callers" do
@@ -51,23 +51,23 @@ defmodule Mediate.Postgres.BindingTest do
     assert {:ok, %Binding{schemas: [Folder]}} = Binding.resolve()
   end
 
-  test "with nothing bound and no override, resolve says so" do
-    assert {:error, %Error{reason: :invalid, detail: "invalid binding: nothing bound and no override"}} =
-             Binding.resolve()
+  test "with nothing bound and no override, resolve says so and names the call that binds" do
+    assert {:error, %Error{reason: :invalid, message: message}} = Binding.resolve()
+    assert message == "invalid binding: nothing bound and no override; call Mediate.Postgres.Binding.bind!/1 at boot"
   end
 
-  test "an object type resolves to its schema, table, and primary key, and an unknown one to nothing" do
+  test "a resource type resolves to its table and primary key, and an unknown one to nothing" do
     assert {:ok, binding} = Binding.new(repo: Sandboxed, schemas: [Folder, Item, Membership, Account])
-    assert Binding.target(binding, :folder) == {Folder, "mediate_fixture_folders", :id}
-    assert Binding.target(binding, :item) == {Item, "mediate_fixture_items", :id}
-    assert Binding.target(binding, :document) == nil
+    assert Binding.table_of(binding, :folder) == {"mediate_fixture_folders", :id}
+    assert Binding.table_of(binding, :item) == {"mediate_fixture_items", :id}
+    assert Binding.table_of(binding, :document) == nil
   end
 
   test "the binding round-trips through the keyword list its schema validates" do
     assert %NimbleOptions{} = Binding.options_schema()
     assert {:ok, binding} = Binding.new(repo: Sandboxed, schemas: [Folder])
 
-    assert Binding.to_keyword(binding) == [repo: Sandboxed, schemas: [Folder], migrations_table: "schema_migrations"]
+    assert Binding.to_keyword(binding) == [repo: Sandboxed, schemas: [Folder], migration_source: "schema_migrations"]
     assert Binding.new(Binding.to_keyword(binding)) == {:ok, binding}
   end
 

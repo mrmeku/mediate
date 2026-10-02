@@ -11,7 +11,7 @@ defmodule Example.Domain.Enterprise do
     field(:country, :string)
   end
 
-  object_type(:enterprise)
-  audited(:entity)
-  fact(:country, kind: :object_attribute, object: :id)
+  resource_type(:enterprise)
+  identity(:other)
+  fact(:country, about: :resource, resource: :id)
 end

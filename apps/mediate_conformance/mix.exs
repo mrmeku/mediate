@@ -8,7 +8,7 @@ defmodule Mediate.Conformance.MixProject do
     [
       app: :mediate_conformance,
       version: @version,
-      description: "The suites that hold a Mediate adapter and a mediated repo to the conformance laws.",
+      description: "The cases that hold a Mediate engine and a mediated repo to the conformance requirements.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",
@@ -50,10 +50,10 @@ defmodule Mediate.Conformance.MixProject do
     ]
   end
 
-  # The templates ship in lib, so an adopter's suite draws a population from
+  # The cases ship in lib, so an adopter's suite draws a world from
   # them. stream_data carries no `only:` for that reason, and telemetry is
-  # here because the audit laws attach a handler. ecto_sql and postgrex
-  # serve this package's own run of the repo template. Each published
+  # here because the audit procedures attach a handler. ecto_sql and postgrex
+  # serve this package's own run of the repo case. Each published
   # requirement is compatible rather than exact, so an adopter already on a
   # later patch can install this package, and mix.lock holds the version and
   # the checksum this repository builds against. Versions verified against

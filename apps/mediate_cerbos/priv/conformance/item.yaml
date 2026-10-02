@@ -1,4 +1,4 @@
-# The neutral fixture's rule for an item, which answers as its folder does:
+# The reference world's rule for an item, which answers as its folder does:
 # the attribute declaration carries the folder's memberships to the item, so
 # the policy reads the same attribute name the folder's does.
 apiVersion: api.cerbos.dev/v1
@@ -8,7 +8,7 @@ resourcePolicy:
   rules:
     - actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:
@@ -20,7 +20,7 @@ resourcePolicy:
                     - expr: '"editor" in request.resource.attr.member_roles'
     - actions: ["edit"]
       effect: EFFECT_ALLOW
-      roles: ["user", "non_person_entity", "privileged"]
+      roles: ["user", "service", "privileged"]
       condition:
         match:
           all:

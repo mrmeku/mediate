@@ -7,24 +7,24 @@ defmodule Mediate.Postgres.CatalogTest do
   alias Mediate.Fixture.Item
   alias Mediate.Postgres.Binding
   alias Mediate.Postgres.Catalog
-  alias Mediate.Postgres.Conformance.Rules
-  alias Mediate.Postgres.Policy
+  alias Mediate.Postgres.Conformance.Reference
   alias Mediate.Postgres.Probe
+  alias Mediate.Postgres.Rule
   alias Mediate.TestRepos.Sandboxed
 
   setup do
     Sandbox.checkout(Sandboxed)
   end
 
-  test "the catalog is the version, the policies of the bound tables, and the columns they read" do
-    catalog = Catalog.read!(binding!())
+  test "the catalog is the policy version, the rules of the bound tables, and the columns they read" do
+    assert {:ok, catalog} = Catalog.read(binding!())
 
-    assert catalog.version == to_string(Rules.version())
-    assert {"mediate_fixture_folders", "id"} in catalog.columns
-    assert {"mediate_fixture_memberships", "role"} in catalog.columns
+    assert catalog.policy_version == to_string(Reference.version())
+    assert {"mediate_fixture_folders", "id"} in catalog.reads
+    assert {"mediate_fixture_memberships", "role"} in catalog.reads
 
     written =
-      catalog.policies
+      catalog.rules
       |> Enum.map(& &1.name)
       |> Enum.uniq()
       |> Enum.sort()
@@ -32,29 +32,41 @@ defmodule Mediate.Postgres.CatalogTest do
     assert written == names()
   end
 
-  test "a scope policy and a gate policy are found by the operation they were written for" do
-    catalog = Catalog.read!(binding!())
+  test "a filter rule and a gate rule are found by the action they were written for" do
+    {:ok, catalog} = Catalog.read(binding!())
 
-    assert %Policy{command: :select, using: using} = Catalog.scope(catalog, "mediate_fixture_folders", :read)
+    assert %Rule{command: :select, using: using} = Catalog.filter_rule(catalog, "mediate_fixture_folders", :read)
     assert using =~ "'read'::text"
-    assert %Policy{command: :update} = Catalog.gate(catalog, "mediate_fixture_folders", :edit)
-    assert Catalog.gate(catalog, "mediate_fixture_items", :edit) == nil
-    assert Catalog.scope(catalog, "mediate_fixture_folders", :publish) == nil
+    assert %Rule{command: :update} = Catalog.gate_rule(catalog, "mediate_fixture_folders", :edit)
+    assert Catalog.gate_rule(catalog, "mediate_fixture_items", :edit) == nil
+    assert Catalog.filter_rule(catalog, "mediate_fixture_folders", :publish) == nil
   end
 
-  test "the text a version carries names the table, the policy, the command, and both expressions" do
-    catalog = Catalog.read!(binding!())
-    text = Catalog.to_text(catalog.policies)
+  test "resolve answers the kept catalog, and loads on first use for a caller that did not" do
+    binding = binding!()
 
-    assert text =~ "mediate_fixture_folders mediate_gate_edit update\n"
-    assert text =~ "  WITH CHECK -\n"
+    assert {:ok, %Catalog{} = loaded} = Catalog.resolve(binding)
+    assert Catalog.resolve(binding) == {:ok, loaded}
+    assert Catalog.load!(binding) == loaded
   end
 
-  test "a migrations table that holds no version is an invalid catalog" do
-    binding = binding!(migrations_table: Probe.empty_versions())
+  test "a migration source that holds no version is an invalid catalog, and the message says what to run" do
+    binding = binding!(migration_source: Probe.empty_migrations())
 
-    assert %Error{reason: :invalid, detail: "invalid catalog: " <> detail} = catch_error(Catalog.read!(binding))
-    assert detail == "#{Probe.empty_versions()} holds no migration version"
+    assert {:error, %Error{reason: :invalid, message: "invalid catalog: " <> message}} = Catalog.read(binding)
+
+    assert message ==
+             "#{Probe.empty_migrations()} holds no migration version; run the migrations before " <>
+               "Mediate.Postgres.load_catalog/0"
+
+    assert_raise Error, fn -> Catalog.load!(binding) end
+  end
+
+  test "a statement the driver refuses is an engine failure carrying the driver's text" do
+    assert {:error, %Error{reason: :engine_failed, message: "catalog read failed: " <> text}} =
+             Catalog.read(binding!(migration_source: "mediate_no_such_table"))
+
+    assert text =~ "mediate_no_such_table"
   end
 
   defp names do
@@ -62,9 +74,9 @@ defmodule Mediate.Postgres.CatalogTest do
       mediate_admit_delete
       mediate_admit_insert
       mediate_exempt_mediate_owner_select
+      mediate_filter_edit
+      mediate_filter_read
       mediate_gate_edit
-      mediate_scope_edit
-      mediate_scope_read
     )
   end
 

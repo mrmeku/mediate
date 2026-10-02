@@ -10,7 +10,7 @@ migrations =
     {version, module}
   end
 
-# Both repos point at one database, because the committed scenarios write
+# Both repos point at one database, because the durable scenarios write
 # through the app repo and truncate through the owner repo. The `otp_app` is
 # the example's, because the repo modules read their configuration there.
 Mediate.Dev.Cluster.start(
@@ -20,14 +20,14 @@ Mediate.Dev.Cluster.start(
     {Example.Infrastructure.OwnerRepo, role: :owner, database: :sandboxed, pool_size: 2}
   ],
   migrate: fn repo ->
-    [_domain, _rules] = Ecto.Migrator.run(repo, migrations, :up, all: true, log: false)
+    [_domain, _policy] = Ecto.Migrator.run(repo, migrations, :up, all: true, log: false)
     :ok
   end
 )
 
-# The application leaves the publish to whoever starts the repos, and here
-# the cluster does. So a run has one policy-version event rather than two.
-{:ok, _published} = Mediate.Rbac.publish()
+# The application leaves the policy release to whoever starts the repos, and
+# here the cluster does. So a run has one policy release rather than two.
+{:ok, _release} = Mediate.Rbac.release()
 
 Sandbox.mode(Repo, :manual)
 

@@ -4,7 +4,7 @@ defmodule Example.Domain.Repository do
   it, a visibility marks it, and a date lifts its embargo or no date does.
   It carries its project, its owning team, its visibility, and its
   proposals, because a repository decision admits queries on them. It does
-  not carry its directories, which have an object type and decisions of
+  not carry its directories, which have a resource type and decisions of
   their own.
 
   The repository, the visibility, the directory, and the proposal share
@@ -32,12 +32,12 @@ defmodule Example.Domain.Repository do
     has_many(:proposals, Proposal)
   end
 
-  object_type(:repository)
-  carries([:project, :owning_team, :visibility, :proposals])
-  audited(:entity)
-  fact(:embargo, kind: :object_attribute, object: :id)
-  fact(:project_id, kind: :object_attribute, object: :id)
-  fact(:owning_team_id, kind: :object_attribute, object: :id)
+  resource_type(:repository)
+  covers([:project, :owning_team, :visibility, :proposals])
+  identity(:other)
+  fact(:embargo, about: :resource, resource: :id)
+  fact(:project_id, about: :resource, resource: :id)
+  fact(:owning_team_id, about: :resource, resource: :id)
 end
 
 defmodule Example.Domain.Visibility do
@@ -45,8 +45,8 @@ defmodule Example.Domain.Visibility do
   The restrictions that stand on a repository, which is not the public or
   private setting a code host shows: labels, restrictions, the countries
   REGIONS releases to, and the accounts INVITE ONLY admits. Each set emits
-  one fact event per element. The invited accounts are a relationship whose
-  subjects are its elements.
+  one fact per element. The invited list is a grant whose subjects are
+  its elements.
   """
 
   use Ecto.Schema
@@ -59,7 +59,7 @@ defmodule Example.Domain.Visibility do
 
   schema "visibilities" do
     field(:labels, {:array, :string}, default: [])
-    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.all(), default: [])
+    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.kinds(), default: [])
     field(:releasable_to, {:array, :string}, default: [])
     field(:invited, {:array, :string}, default: [])
     belongs_to(:repository, Repository)
@@ -73,19 +73,19 @@ defmodule Example.Domain.Visibility do
     |> Ecto.Changeset.update_change(:invited, &Enum.sort(Enum.uniq(&1)))
   end
 
-  object_type(:visibility)
-  audited(:entity)
-  fact(:labels, kind: :object_attribute, object: :repository_id, element: :label)
-  fact(:restrictions, kind: :object_attribute, object: :repository_id, element: :restriction)
-  fact(:releasable_to, kind: :object_attribute, object: :repository_id, element: :country)
-  fact(:invited, kind: :relationship, object: :repository_id, element: :user)
+  resource_type(:visibility)
+  identity(:other)
+  fact(:labels, about: :resource, resource: :repository_id, element: :label)
+  fact(:restrictions, about: :resource, resource: :repository_id, element: :restriction)
+  fact(:releasable_to, about: :resource, resource: :repository_id, element: :country)
+  fact(:invited, about: :grant, resource: :repository_id, element: :account)
 end
 
 defmodule Example.Domain.Directory do
   @moduledoc """
   A directory of a repository with a visibility of its own. The
   repository's rollup combines the directories' visibilities and admits no
-  subject any of them denies. It carries its repository, which the rules
+  subject any of them denies. It carries its repository, which the clauses
   reach it through.
   """
 
@@ -101,7 +101,7 @@ defmodule Example.Domain.Directory do
     field(:name, :string)
     field(:contents, :string)
     field(:labels, {:array, :string}, default: [])
-    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.all(), default: [])
+    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.kinds(), default: [])
     field(:releasable_to, {:array, :string}, default: [])
     belongs_to(:repository, Repository)
   end
@@ -112,13 +112,13 @@ defmodule Example.Domain.Directory do
     Ecto.Changeset.cast(directory, attrs, [:labels, :restrictions, :releasable_to])
   end
 
-  object_type(:directory)
-  carries([:repository])
-  audited(:entity)
-  fact(:repository_id, kind: :object_attribute, object: :id)
-  fact(:labels, kind: :object_attribute, object: :id, element: :label)
-  fact(:restrictions, kind: :object_attribute, object: :id, element: :restriction)
-  fact(:releasable_to, kind: :object_attribute, object: :id, element: :country)
+  resource_type(:directory)
+  covers([:repository])
+  identity(:other)
+  fact(:repository_id, about: :resource, resource: :id)
+  fact(:labels, about: :resource, resource: :id, element: :label)
+  fact(:restrictions, about: :resource, resource: :id, element: :restriction)
+  fact(:releasable_to, about: :resource, resource: :id, element: :country)
 end
 
 defmodule Example.Domain.Proposal do
@@ -136,12 +136,12 @@ defmodule Example.Domain.Proposal do
 
   @type t :: %__MODULE__{}
 
-  schema "visibility_proposals" do
+  schema "proposals" do
     field(:proposer_id, :string)
     field(:reviewer_id, :string)
     field(:status, Ecto.Enum, values: [:pending, :approved], default: :pending)
     field(:labels, {:array, :string}, default: [])
-    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.all(), default: [])
+    field(:restrictions, {:array, Ecto.Enum}, values: Restrictions.kinds(), default: [])
     field(:releasable_to, {:array, :string}, default: [])
     field(:invited, {:array, :string}, default: [])
     belongs_to(:repository, Repository)
@@ -161,10 +161,10 @@ defmodule Example.Domain.Proposal do
     Map.take(proposal, [:labels, :restrictions, :releasable_to, :invited])
   end
 
-  object_type(:proposal)
-  carries([:repository])
-  audited(:entity)
-  fact(:repository_id, kind: :object_attribute, object: :id)
-  fact(:proposer_id, kind: :object_attribute, object: :id)
-  relationship(subject: :proposer_id, object: :repository_id, attributes: [:status])
+  resource_type(:proposal)
+  covers([:repository])
+  identity(:other)
+  fact(:repository_id, about: :resource, resource: :id)
+  fact(:proposer_id, about: :resource, resource: :id)
+  grant(subject: :proposer_id, resource: :repository_id, attributes: [:status])
 end

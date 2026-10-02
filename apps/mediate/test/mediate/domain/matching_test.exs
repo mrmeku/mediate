@@ -26,7 +26,7 @@ defmodule Mediate.Domain.MatchingTest do
         flunk("judged " <> inspect(judged))
       end)
 
-    assert %Error{reason: :unmediated} = error
+    assert %Error{reason: :decision_missing} = error
 
     assert Exception.message(error) ==
              "Repo.prepare_query/3 on #{inspect(Folder)} carries no decision and no exemption " <>
@@ -64,20 +64,20 @@ defmodule Mediate.Domain.MatchingTest do
     decision = %Decision{
       id: Id.new(),
       subject: {:user, "user-1"},
-      object: {type, 1},
-      operation: :read,
-      verdict: :allow,
-      reason: :allowed,
-      adapter: Fake,
+      resource: {type, 1},
+      action: :read,
+      effect: :allow,
+      reason: :rule_allowed,
+      engine: Fake,
       policy_version: nil,
-      operation_id: Id.new(),
-      at: DateTime.utc_now()
+      correlation_id: Id.new(),
+      decided_at: DateTime.utc_now()
     }
 
     Mediation.decided({:all, 2}, Folder, decision)
   end
 
-  # The module a refusal names, which the seam reads from the stack and a
+  # The module a refusal names, which the mediated repo reads from the stack and a
   # test of the rules themselves supplies.
   defp caller, do: fn -> __MODULE__ end
 end

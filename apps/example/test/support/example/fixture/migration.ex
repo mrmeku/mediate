@@ -1,5 +1,5 @@
 defmodule Example.Fixture.Migration do
-  @moduledoc "The one migration the example's own suite runs: the domain helper, as a thin application's first migration calls it."
+  @moduledoc "The one migration the example's own suite runs: the domain helper, as a deployment's first migration calls it."
 
   use Boundary, top_level?: true, deps: [Example, Ecto.Migration]
   use Ecto.Migration

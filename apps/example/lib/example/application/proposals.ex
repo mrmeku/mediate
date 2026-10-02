@@ -17,12 +17,12 @@ defmodule Example.Application.Proposals do
           {:ok, Proposal.t()} | {:error, Repositories.refusal()}
   def propose({_kind, proposer} = subject, repository_id, attrs, opts \\ [])
       when is_integer(repository_id) and is_map(attrs) do
-    with {:ok, decision} <- Mediate.authorize(subject, :propose_visibility, Repositories.object(repository_id), opts),
+    with {:ok, decision} <- Mediate.authorize(subject, :propose_visibility, Repositories.resource(repository_id), opts),
          {:ok, repository} <- Repositories.fetch(repository_id, decision) do
       proposal = Proposal.changeset(%Proposal{proposer_id: proposer, repository_id: repository.id}, attrs)
       change = appended(repository, proposal, decision)
 
-      with {:ok, %Repository{proposals: proposals}} <- Repo.update(change, mediate: decision) do
+      with {:ok, %Repository{proposals: proposals}} <- Repo.update(change, authorized_by: decision) do
         {:ok, List.last(proposals)}
       end
     end
@@ -32,11 +32,11 @@ defmodule Example.Application.Proposals do
   @spec approve(Mediate.subject(), integer(), keyword()) ::
           {:ok, Proposal.t()} | {:error, Repositories.refusal() | Repositories.RollupViolation.t()}
   def approve({_kind, reviewer} = subject, proposal_id, opts \\ []) when is_integer(proposal_id) do
-    object = Repositories.object(:proposal, proposal_id)
+    resource = Repositories.resource(:proposal, proposal_id)
 
-    with {:ok, decision} <- Mediate.authorize(subject, :approve_visibility, object, opts),
+    with {:ok, decision} <- Mediate.authorize(subject, :approve_visibility, resource, opts),
          %Proposal{status: :pending} = proposal <-
-           Repo.get(Proposal, proposal_id, mediate: decision) || {:error, :not_found} do
+           Repo.get(Proposal, proposal_id, authorized_by: decision) || {:error, :not_found} do
       Repo.transaction(fn -> approve_or_roll_back(proposal, reviewer, decision) end)
     else
       %Proposal{status: :approved} -> {:error, :not_found}
@@ -45,14 +45,14 @@ defmodule Example.Application.Proposals do
   end
 
   defp approve_or_roll_back(%Proposal{} = proposal, reviewer, decision) do
-    proposal = Repo.preload(proposal, [repository: :visibility], mediate: decision)
+    proposal = Repo.preload(proposal, [repository: :visibility], authorized_by: decision)
 
-    case Repositories.visibility_change(proposal.repository, Proposal.visibility(proposal)) do
+    case Repositories.visibility_changeset(proposal.repository, Proposal.visibility(proposal)) do
       {:ok, repository_change} ->
         proposal
         |> Ecto.Changeset.change(status: :approved, reviewer_id: reviewer)
         |> Ecto.Changeset.put_assoc(:repository, repository_change)
-        |> Repo.update!(mediate: decision)
+        |> Repo.update!(authorized_by: decision)
 
       {:error, violation} ->
         Repo.rollback(violation)
@@ -60,7 +60,7 @@ defmodule Example.Application.Proposals do
   end
 
   defp appended(%Repository{} = repository, proposal, decision) do
-    repository = Repo.preload(repository, :proposals, mediate: decision)
+    repository = Repo.preload(repository, :proposals, authorized_by: decision)
 
     repository
     |> Ecto.Changeset.change()

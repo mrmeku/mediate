@@ -1,14 +1,14 @@
 defmodule Mediate.CerbosTest do
   use ExUnit.Case, async: true
 
-  alias Mediate.Answer
   alias Mediate.Cerbos.Binding
-  alias Mediate.Cerbos.Conformance.Attributes
-  alias Mediate.Cerbos.Sidecar
+  alias Mediate.Cerbos.Conformance.Reference
+  alias Mediate.Cerbos.Conformance.Server
   alias Mediate.Dev
   alias Mediate.Error
   alias Mediate.Fixture.Folder
   alias Mediate.TestRepos.Sandboxed
+  alias Mediate.Verdict
 
   @ann {:user, "ann"}
   @folder {:folder, 1}
@@ -26,15 +26,15 @@ resourcePolicy:
         match:
           all:
             of:
-              - expr: request.principal.attr.environment.reauthenticated_at != null
+              - expr: request.principal.attr.context.reauthenticated_at != null
               - expr: >
-                  timestamp(request.principal.attr.environment.now) -
-                  timestamp(request.principal.attr.environment.reauthenticated_at) < duration("900s")
+                  timestamp(request.principal.attr.context.now) -
+                  timestamp(request.principal.attr.context.reauthenticated_at) < duration("900s")
 |
 
   defmodule Window do
     @moduledoc false
-    use Mediate.Cerbos.Attributes
+    use Mediate.Cerbos.Declarations
 
     alias Mediate.Fixture.Account
 
@@ -44,68 +44,69 @@ resourcePolicy:
     resource :folder, schema: Folder do
     end
 
-    environment do
+    context do
       fact(:reauthenticated_at)
     end
   end
 
   setup do
-    sidecar = Dev.Cerbos.info()
+    server = Dev.Cerbos.current!()
 
     :ok =
-      Binding.override(repo: Sandboxed, attributes: Attributes, policies: sidecar.policies, commit: "conformance")
+      Binding.override(repo: Sandboxed, declarations: Reference, policy_dir: server.policy_dir, commit: "conformance")
 
-    {:ok, address: sidecar.address, environment: %{now: DateTime.utc_now()}}
+    {:ok, address: server.http, context: %{now: DateTime.utc_now()}}
   end
 
-  test "the adapter caps no scope, and its entry carries the address alone" do
-    assert Mediate.Cerbos.scope_cap() == :none
+  test "the engine has no filter limit, and its entry carries the address alone" do
+    assert Mediate.Cerbos.filter_limit() == :infinity
     assert Mediate.Cerbos.options_schema().schema[:address][:required]
     assert Keyword.keys(Mediate.Cerbos.options_schema().schema) == [:address]
   end
 
   test "an entry with no address is an engine error naming the callback that failed", ctx do
-    for {operation, call} <- callbacks(ctx, []) do
-      assert {:error, %Error{reason: :engine_unreachable} = error} = call.()
+    for {callback, call} <- callbacks(ctx, []) do
+      assert {:error, %Error{reason: :engine_failed} = error} = call.()
 
-      assert error.detail ==
-               "#{inspect(Mediate.Cerbos)} failed during #{operation}: " <>
-                 "the configuration entry names no address for the sidecar"
+      assert error.message ==
+               "Mediate.Cerbos failed during #{callback}: invalid engine: {Mediate.Cerbos, []} names no address; " <>
+                 "add address: \"host:port\""
     end
   end
 
   test "a binding that does not resolve is an engine error naming the callback that failed", ctx do
-    :ok = Binding.override(attributes: Folder)
+    :ok = Binding.override(declarations: Folder)
 
-    for {operation, call} <- callbacks(ctx, address: ctx.address) do
-      assert {:error, %Error{reason: :engine_unreachable} = error} = call.()
+    for {callback, call} <- callbacks(ctx, address: ctx.address) do
+      assert {:error, %Error{reason: :engine_failed} = error} = call.()
 
-      assert error.detail ==
-               "#{inspect(Mediate.Cerbos)} failed during #{operation}: invalid binding: " <>
-                 "Mediate.Fixture.Folder did not use Mediate.Cerbos.Attributes"
+      assert error.message ==
+               "Mediate.Cerbos failed during #{callback}: invalid binding: " <>
+                 "Mediate.Fixture.Folder did not use Mediate.Cerbos.Declarations; " <>
+                 "add use Mediate.Cerbos.Declarations or bind the module that does"
     end
   end
 
-  test "a policy that reads a request-time fact is answered from the moment the request carries" do
-    sidecar = Sidecar.over!([{"folder.yaml", @window}])
-    :ok = Binding.override(repo: Sandboxed, attributes: Window, policies: sidecar.policies, commit: "window")
+  test "a policy that reads a context fact is answered from the moment the request carries" do
+    server = Server.start!([{"folder.yaml", @window}])
+    :ok = Binding.override(repo: Sandboxed, declarations: Window, policy_dir: server.policy_dir, commit: "window")
     now = ~U[2026-09-09 12:00:00Z]
-    options = [address: sidecar.address]
+    options = [address: server.http]
 
     fresh = %{now: now, reauthenticated_at: DateTime.shift(now, minute: -1)}
-    assert {:ok, %Answer{verdict: :allow}} = Mediate.Cerbos.decide(@ann, :read, @folder, fresh, options)
+    assert {:ok, %Verdict{effect: :allow}} = Mediate.Cerbos.authorize(@ann, :read, @folder, fresh, options)
 
     stale = %{now: now, reauthenticated_at: DateTime.shift(now, second: -901)}
-    assert {:ok, %Answer{verdict: :deny}} = Mediate.Cerbos.decide(@ann, :read, @folder, stale, options)
+    assert {:ok, %Verdict{effect: :deny}} = Mediate.Cerbos.authorize(@ann, :read, @folder, stale, options)
 
     absent = %{now: now}
-    assert {:ok, %Answer{verdict: :deny}} = Mediate.Cerbos.decide(@ann, :read, @folder, absent, options)
+    assert {:ok, %Verdict{effect: :deny}} = Mediate.Cerbos.authorize(@ann, :read, @folder, absent, options)
   end
 
   defp callbacks(ctx, options) do
     [
-      {:decide, fn -> Mediate.Cerbos.decide(@ann, :read, @folder, ctx.environment, options) end},
-      {:scope, fn -> Mediate.Cerbos.scope(@ann, :read, :folder, ctx.environment, options) end}
+      {:authorize, fn -> Mediate.Cerbos.authorize(@ann, :read, @folder, ctx.context, options) end},
+      {:filter, fn -> Mediate.Cerbos.filter(@ann, :read, :folder, ctx.context, options) end}
     ]
   end
 end

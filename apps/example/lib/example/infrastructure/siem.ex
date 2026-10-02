@@ -1,29 +1,28 @@
-defmodule Example.Infrastructure.Siem do
+defmodule Example.Infrastructure.SIEM do
   @moduledoc """
   The example's consumer of the library's three events. It is a process
-  that maps every decision, change, and access event to an OCSF record and
-  holds the result in memory.
+  that maps every decision, identity write, and resource read event to an
+  OCSF record and holds the result in memory: the security log.
 
-  A deployment sends those records to its security log. A list keeps the
-  mapping under test and puts no schema version in a published package. The
-  mapping lives in the Ocsf module beside this one, against OCSF 1.3.0,
-  and `schema_version/0` answers that version. It answers from the payload
-  alone. What OCSF names no field for travels under `unmapped`. A decision
-  event with `verdict: nil`, one whose call raised, is dropped, because it
-  is no decision.
+  A deployment sends those records to its own security log. A list keeps
+  the mapping under test and puts no schema version in a published
+  package. The mapping lives in the OCSF module beside this one, against
+  OCSF 1.3.0, and `ocsf_version/0` answers that version. It answers from
+  the payload alone. What OCSF names no field for travels under
+  `unmapped`. A decision event whose call raised, one with `effect: nil`,
+  is dropped, because it is no decision.
 
   Records arrive as casts, and a caller reads them with calls. So a caller
-  that caused an event reads its own records afterwards. The thin
-  application starts one at boot. A test starts its own, unattached, and
-  feeds it payloads.
+  that caused an event reads its own records afterwards. A deployment
+  starts one at boot. A test starts its own, unattached, and feeds it
+  payloads.
   """
 
   use GenServer
 
-  alias Example.Infrastructure.Ocsf
-  alias Mediate.Access
-  alias Mediate.Change
-  alias Mediate.Port
+  alias Example.Infrastructure.OCSF
+  alias Mediate.IdentityWrite
+  alias Mediate.ResourceRead
 
   @schema NimbleOptions.new!(
             name: [type: :any, doc: "A registered name, or none."],
@@ -42,35 +41,35 @@ defmodule Example.Infrastructure.Siem do
   end
 
   @doc "The OCSF schema version of its records."
-  @spec schema_version() :: String.t()
-  defdelegate schema_version, to: Ocsf, as: :version
+  @spec ocsf_version() :: String.t()
+  defdelegate ocsf_version, to: OCSF, as: :version
 
   @doc "Every record it holds, oldest first."
   @spec records(GenServer.server()) :: [map()]
   def records(siem), do: GenServer.call(siem, :records)
 
-  @doc "The records of one operation, oldest first."
+  @doc "The records of one correlation id, oldest first."
   @spec records(GenServer.server(), String.t()) :: [map()]
-  def records(siem, operation_id) when is_binary(operation_id) do
+  def records(siem, correlation_id) when is_binary(correlation_id) do
     siem
     |> records()
-    |> Enum.filter(&(&1.metadata.correlation_uid == operation_id))
+    |> Enum.filter(&(&1.metadata.correlation_uid == correlation_id))
   end
 
   @doc false
   @spec handle_event([atom()], map(), map(), GenServer.server()) :: :ok
-  def handle_event([:mediate, :change], _measurements, payload, siem) do
-    record(siem, Ocsf.change(payload))
+  def handle_event([:mediate, :identity, :write], _measurements, payload, siem) do
+    record(siem, OCSF.identity_write(payload))
   end
 
-  def handle_event([:mediate, :access], _measurements, payload, siem) do
-    record(siem, Ocsf.access(payload))
+  def handle_event([:mediate, :resource, :read], _measurements, payload, siem) do
+    record(siem, OCSF.resource_read(payload))
   end
 
-  def handle_event([:mediate, :decision], _measurements, %{verdict: nil}, _siem), do: :ok
+  def handle_event([:mediate, :decision], _measurements, %{effect: nil}, _siem), do: :ok
 
-  def handle_event([:mediate, :decision], %{duration: duration}, metadata, siem) do
-    record(siem, Ocsf.decision(metadata, duration))
+  def handle_event([:mediate, :decision], %{duration_microseconds: duration}, payload, siem) do
+    record(siem, OCSF.decision(payload, duration))
   end
 
   @impl GenServer
@@ -93,7 +92,7 @@ defmodule Example.Infrastructure.Siem do
   def terminate(_reason, %{attached: true}), do: :telemetry.detach(handler_id())
   def terminate(_reason, _state), do: :ok
 
-  defp events, do: [Port.event(), Change.event(), Access.event()]
+  defp events, do: [Mediate.event(), IdentityWrite.event(), ResourceRead.event()]
 
   defp record(siem, record) when is_map(record), do: GenServer.cast(siem, {:record, record})
 

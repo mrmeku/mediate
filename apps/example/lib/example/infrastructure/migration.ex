@@ -1,9 +1,9 @@
 defmodule Example.Infrastructure.Migration do
   @moduledoc """
-  The domain tables, as a helper a thin application's first migration
-  calls. The library ships no migration files. Every table receives the
-  application role's grants. No foreign key cascades into a fact schema, so
-  a revocation deletes nothing but the fact.
+  The domain tables, as a helper a deployment's first migration calls.
+  The library ships no migration files. Every table receives the
+  application role's grants. No foreign key cascades into an identity
+  schema, so a revocation deletes nothing but the grant.
 
       defmodule ExampleRbac.Repo.Migrations.Domain do
         use Ecto.Migration
@@ -22,9 +22,9 @@ defmodule Example.Infrastructure.Migration do
             ]
           )
 
-  @serial_tables ~w(enterprises teams projects account_roles memberships team_roles repositories visibilities directories
-    visibility_proposals override_reports)a
-  @keyed_tables ~w(users labels)a
+  @serial_tables ~w(enterprises teams projects permissions memberships team_roles repositories visibilities directories
+    proposals override_reports)a
+  @keyed_tables ~w(accounts labels)a
 
   @doc "Create the domain tables and the grants. Options: #{NimbleOptions.docs(@schema)}"
   @spec up(keyword()) :: :ok
@@ -32,10 +32,10 @@ defmodule Example.Infrastructure.Migration do
     options = NimbleOptions.validate!(options, @schema)
     tenancy()
     accounts()
-    roles()
+    grants()
     repositories()
     proposals_and_reports()
-    grants(options[:app_role])
+    privileges(options[:app_role])
     :ok
   end
 
@@ -75,7 +75,7 @@ defmodule Example.Infrastructure.Migration do
   end
 
   defp accounts do
-    create table(:users, primary_key: false) do
+    create table(:accounts, primary_key: false) do
       add :id, :text, primary_key: true
       add :name, :text, null: false
       add :kind, :text, null: false
@@ -84,30 +84,30 @@ defmodule Example.Infrastructure.Migration do
       add :country, :text, null: false
     end
 
-    create table(:account_roles) do
-      add :user_id, references(:users, type: :text), null: false
-      add :role, :text, null: false
+    create table(:permissions) do
+      add :account_id, references(:accounts, type: :text), null: false
+      add :permission, :text, null: false
     end
 
-    create unique_index(:account_roles, [:user_id, :role])
+    create unique_index(:permissions, [:account_id, :permission])
   end
 
-  defp roles do
+  defp grants do
     create table(:memberships) do
-      add :user_id, references(:users, type: :text), null: false
+      add :account_id, references(:accounts, type: :text), null: false
       add :project_id, references(:projects), null: false
       add :role, :text, null: false
     end
 
-    create unique_index(:memberships, [:user_id, :project_id])
+    create unique_index(:memberships, [:account_id, :project_id])
 
     create table(:team_roles) do
-      add :user_id, references(:users, type: :text), null: false
+      add :account_id, references(:accounts, type: :text), null: false
       add :team_id, references(:teams), null: false
       add :role, :text, null: false
     end
 
-    create unique_index(:team_roles, [:user_id, :team_id, :role])
+    create unique_index(:team_roles, [:account_id, :team_id, :role])
   end
 
   defp repositories do
@@ -139,10 +139,10 @@ defmodule Example.Infrastructure.Migration do
   end
 
   defp proposals_and_reports do
-    create table(:visibility_proposals) do
+    create table(:proposals) do
       add :repository_id, references(:repositories), null: false
-      add :proposer_id, references(:users, type: :text), null: false
-      add :reviewer_id, references(:users, type: :text)
+      add :proposer_id, references(:accounts, type: :text), null: false
+      add :reviewer_id, references(:accounts, type: :text)
       add :status, :text, null: false, default: "pending"
       add :labels, {:array, :text}, null: false, default: []
       add :restrictions, {:array, :text}, null: false, default: []
@@ -153,14 +153,15 @@ defmodule Example.Infrastructure.Migration do
     create table(:override_reports) do
       add :repository_id, references(:repositories), null: false
       add :team_id, references(:teams), null: false
-      add :user_id, references(:users, type: :text), null: false
+      add :account_id, references(:accounts, type: :text), null: false
       add :justification, :text, null: false
-      add :operation_id, :text, null: false
-      add :at, :utc_datetime, null: false
+      add :correlation_id, :text, null: false
+      add :read_at, :utc_datetime, null: false
     end
   end
 
-  defp grants(app_role) do
+  # The database privileges, which are not the domain's grants.
+  defp privileges(app_role) do
     for name <- @serial_tables ++ @keyed_tables do
       execute "GRANT SELECT, INSERT, UPDATE, DELETE ON #{name} TO #{app_role}"
     end

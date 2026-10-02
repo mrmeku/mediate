@@ -18,11 +18,11 @@ two Credo checks, and four adapters.
   the decision, change, access, and policy-version events; the configuration.
 - `mediate_conformance`: the adapter case that runs the laws, and the repo case
   that runs the seam's guarantees.
-- `mediate_credo`: `Mediate.Credo.NoRawSQL` and `Mediate.Credo.UnmediatedRepo`.
+- `mediate_credo`: `Mediate.Credo.Check.Warning.RawSQL` and `Mediate.Credo.Check.Warning.UnmediatedRepo`.
 - `mediate_rbac`: rules as Elixir modules.
 - `mediate_postgres`: rules as Postgres row-level security policies.
-- `mediate_cerbos`: rules as policy files a sidecar reads.
-- `mediate_fga`: rules as a relationship model in a store of its own.
+- `mediate_cerbos`: rules as policy files a Cerbos server reads.
+- `mediate_openfga`: rules as a relationship model in a store of its own.
 
 [Unreleased]: https://github.com/mrmeku/mediate/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/mrmeku/mediate/releases/tag/v0.1.0

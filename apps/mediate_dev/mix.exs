@@ -24,11 +24,11 @@ defmodule Mediate.Dev.MixProject do
   end
 
   def cli do
-    [preferred_envs: [quality: :test, "mediate.schema_dump": :test]]
+    [preferred_envs: [quality: :test, "mediate.dump": :test]]
   end
 
   def application do
-    # `:inets` carries `httpc`, which the launchers ask a server's health
+    # `:inets` carries `httpc`, which the server modules ask a health
     # endpoint with. It ships with OTP, so it has no pin.
     [extra_applications: [:logger, :inets]]
   end
@@ -36,15 +36,15 @@ defmodule Mediate.Dev.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  # The schema-dump task reads this key from the application that runs it.
-  # This package's own run points it at a test repo, with the test table as
-  # the one migration.
+  # The dump task reads this key from the application that runs it. This
+  # package's own run points it at a test repo, with the test table as the
+  # one migration.
   defp mediate(:test) do
     [
-      schema_dump: [
+      dump: [
         repo: Mediate.Dev.TestRepos.Dump,
-        output: "tmp/schema/dev.sql",
-        migrations: [{1, Mediate.Dev.TestMigration}]
+        file: "tmp/schema/dev.sql",
+        migrations: [{1, Mediate.Dev.TestRepos.Migration}]
       ]
     ]
   end
@@ -52,7 +52,7 @@ defmodule Mediate.Dev.MixProject do
   defp mediate(_env), do: []
 
   # This package is never published, so each dependency sits here in every
-  # environment and none is optional. `muontrap` runs a sidecar and kills
+  # environment and none is optional. `muontrap` runs a server and kills
   # it with the run. `nimble_options` validates what a caller passes.
   # `ecto_sql` carries the sandbox and the migrator that the cluster and the
   # dump run.

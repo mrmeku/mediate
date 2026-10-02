@@ -1,6 +1,6 @@
 defmodule Mediate.Dev.Package do
   @moduledoc """
-  The mechanism behind `mix mediate.package`. It builds the deployable of
+  The mechanism behind `mix mediate.package`. It builds the tarball of
   every package this repository publishes, and reads back what each tarball
   carries.
 
@@ -12,10 +12,10 @@ defmodule Mediate.Dev.Package do
 
   `check/2` reads `hex_metadata.config` out of the unpacked tarball and not
   the output of the build. A tarball that omits a requirement still exits 0,
-  so what the artifact contains is the thing to assert.
+  so what the tarball contains is the thing to assert.
 
-  `published/0` is the frozen list of packages this repository publishes.
-  The structure test reads it.
+  `published/0` is the frozen list of the published packages. The layout
+  test reads it.
   """
 
   use Boundary, top_level?: true, deps: [Mix]
@@ -27,10 +27,10 @@ defmodule Mediate.Dev.Package do
     mediate_rbac
     mediate_postgres
     mediate_cerbos
-    mediate_fga
+    mediate_openfga
   )a
 
-  @doc "The packages this repository publishes, in the order a release publishes them."
+  @doc "The published packages, in the order a release publishes them."
   @spec published() :: [atom()]
   def published, do: @published
 
@@ -45,16 +45,16 @@ defmodule Mediate.Dev.Package do
   end
 
   @doc """
-  Reads the metadata of each built package and returns one sentence for each
-  thing that would reach Hex wrong. An empty list is a package set that is
-  ready to publish.
+  Reads the metadata of each built package and returns one sentence per
+  problem, each a thing that would reach Hex wrong. An empty list means the
+  published packages are ready to publish.
   """
   @spec check(Path.t(), %{atom() => Path.t()}) :: [String.t()]
   def check(root, built) do
     license = File.read!(Path.join(root, "LICENSE"))
     metadata = Map.new(built, fn {app, dir} -> {app, {dir, metadata(dir)}} end)
 
-    Enum.flat_map(@published, &violations(root, &1, metadata[&1], license)) ++ versions(metadata)
+    Enum.flat_map(@published, &problems(root, &1, metadata[&1], license)) ++ versions(metadata)
   end
 
   defp build_one(root, output, app) do
@@ -86,7 +86,7 @@ defmodule Mediate.Dev.Package do
     end
   end
 
-  defp violations(root, app, {directory, metadata}, license) do
+  defp problems(root, app, {directory, metadata}, license) do
     requirements = Map.get(metadata, "requirements", [])
 
     missing_siblings(root, app, requirements) ++

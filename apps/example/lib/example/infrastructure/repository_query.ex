@@ -1,11 +1,11 @@
 defmodule Example.Infrastructure.RepositoryQuery do
   @moduledoc false
-  # Hidden, because the queries a context runs are not its surface. What is
-  # here is which rows `Example.Application.Repositories` asks for: the
-  # repositories a rule admits, the directories of a repository, and the
-  # overrides a team received. A rule is the `dynamic` the port's `scope` answered with. The
-  # query carries it and does not read it, so nothing here decides who can
-  # see a row.
+  # Hidden, because the queries an application module runs are not its
+  # surface. What is here is which rows `Example.Application.Repositories`
+  # asks for: the repositories a rule admits, the directories of a
+  # repository, and the override reports of a team. A rule is the `dynamic`
+  # `Mediate.filter/4` answered with. The query carries it and does not
+  # read it, so nothing here decides who can see a row.
 
   import Ecto.Query, only: [from: 2, where: 2]
 
@@ -15,8 +15,8 @@ defmodule Example.Infrastructure.RepositoryQuery do
   alias Example.Domain.Repository
 
   @doc "The repositories a rule admits, in id order, each with its rollup."
-  @spec scoped(Query.dynamic_expr()) :: Query.t()
-  def scoped(rule), do: from(r in Repository, where: ^rule, order_by: r.id, preload: :visibility)
+  @spec filtered(Query.dynamic_expr()) :: Query.t()
+  def filtered(rule), do: from(r in Repository, where: ^rule, order_by: r.id, preload: :visibility)
 
   @doc "Every directory of a repository, which the rollup comes from."
   @spec directories(integer()) :: Query.t()
@@ -28,9 +28,9 @@ defmodule Example.Infrastructure.RepositoryQuery do
     from(d in Directory, where: d.repository_id == ^repository_id, where: ^rule, order_by: d.id)
   end
 
-  @doc "The overrides reported to a team, oldest first."
-  @spec reports(integer()) :: Query.t()
-  def reports(team_id) when is_integer(team_id) do
+  @doc "The override reports of a team, oldest first."
+  @spec override_reports(integer()) :: Query.t()
+  def override_reports(team_id) when is_integer(team_id) do
     from(r in OverrideReport, where: r.team_id == ^team_id, order_by: r.id)
   end
 end

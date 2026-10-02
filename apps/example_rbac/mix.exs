@@ -23,10 +23,10 @@ defmodule ExampleRbac.MixProject do
     ]
   end
 
-  # The dump task raises an ephemeral cluster, and the connection library
+  # The dump task starts a cluster of its own, and the connection library
   # under the cluster loads in the test environment alone.
   def cli do
-    [preferred_envs: [quality: :test, "mediate.schema_dump": :test]]
+    [preferred_envs: [quality: :test, "mediate.dump": :test]]
   end
 
   def application do
@@ -36,17 +36,16 @@ defmodule ExampleRbac.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  # What the library's tasks read. The migrations of this repo produce the
-  # committed schema file. The repo's own configuration lives under its
-  # otp_app.
+  # What the library's tasks read. The migrations of this deployment produce
+  # the structure file. The repo's own configuration lives under its otp_app.
   defp mediate do
     [
-      schema_dump: [repo: Example.Infrastructure.OwnerRepo, output: "priv/schema/rbac.sql"]
+      dump: [repo: Example.Infrastructure.OwnerRepo, file: "priv/repo/structure.sql"]
     ]
   end
 
-  # The example, the adapter, and the connection library under the cluster
-  # the dump task raises. Every pin is exact. Versions verified against
+  # The example, the engine, and the connection library under the cluster
+  # the dump task starts. Every pin is exact. Versions verified against
   # https://hex.pm/api/packages/<name> on 2026-09-08.
   defp deps do
     [
@@ -74,7 +73,7 @@ defmodule ExampleRbac.MixProject do
   end
 
   defp docs do
-    [main: "readme", extras: ["README.md": [title: "The example under RBAC in code"]]]
+    [main: "readme", extras: ["README.md": [title: "The example under roles in code"]]]
   end
 
   # CVE-2026-32686 (GHSA-rhv4-8758-jx7v): an unbounded exponent when decimal

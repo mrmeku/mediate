@@ -2,74 +2,82 @@ defmodule Mediate.Rbac.VersionTest do
   use ExUnit.Case, async: true
 
   alias Mediate.Config
-  alias Mediate.PolicyVersion
+  alias Mediate.PolicyRelease
   alias Mediate.Rbac.Binding
   alias Mediate.Rbac.Conformance.Predicates
-  alias Mediate.Rbac.Conformance.Roles
+  alias Mediate.Rbac.Conformance.Reference
   alias Mediate.Rbac.Policy
   alias Mediate.Rbac.Version
   alias Mediate.TestRepos.Sandboxed
 
   setup do
-    :ok = Mediate.Test.with_config(adapter: Mediate.Rbac)
-    :ok = Binding.override(policy: Roles, repo: Sandboxed)
+    :ok = Mediate.Test.with_config(engine: Mediate.Rbac)
+    :ok = Binding.override(policy: Reference, repo: Sandboxed)
   end
 
-  test "the version carries the commit, the hash of the rule modules, and the role table as data" do
+  test "the release carries the version, the hash of the text, and the text with the modules and the role table" do
     {:ok, config} = Config.resolve()
-    at = DateTime.utc_now()
-    version = Version.of(Mediate.Rbac, Roles, config, at)
+    released_at = DateTime.utc_now()
+    release = Version.release(Mediate.Rbac, Reference, config, released_at)
 
-    assert %PolicyVersion{adapter: Mediate.Rbac, version: "conformance", author: "mediate_rbac"} = version
-    assert version.approval == "the conformance suite"
-    assert version.at == at
-    assert version.content_hash == Version.content_hash(Roles)
-    assert String.length(version.content_hash) == 64
-    assert version.content =~ "modules: #{inspect(Predicates)}, #{inspect(Roles)}"
-    assert version.content =~ "  reader: read\n  editor: read, edit\n"
-    assert version.pointer == nil
+    assert %PolicyRelease{engine: Mediate.Rbac, policy_version: "conformance", author: "mediate_rbac"} = release
+    assert release.approval == "the conformance suite"
+    assert release.released_at == released_at
+    assert release.text_hash == Version.text_hash(Reference)
+    assert String.length(release.text_hash) == 64
+    assert release.text == Version.text(Reference)
+    assert release.text =~ "modules:\n  #{inspect(Predicates)}: "
+    assert release.text =~ "\n  #{inspect(Reference)}: "
+    assert release.text =~ "roles:\n  reader: read\n  editor: read, edit\n"
+    assert release.text_location == nil
   end
 
-  test "over the content cap the version carries a pointer to the modules" do
-    :ok = Mediate.Test.with_config(caps: [policy_content_bytes: 8])
+  test "the text names each module with the digest of its bytecode, so a changed rule is a new hash" do
+    digest = Base.encode16(Reference.module_info(:md5), case: :lower)
+    assert Version.text(Reference) =~ "  #{inspect(Reference)}: #{digest}\n"
+    assert Version.text_hash(Reference) == Base.encode16(:crypto.hash(:sha256, Version.text(Reference)), case: :lower)
+  end
+
+  test "over the text cap the release carries the location of the modules" do
+    :ok = Mediate.Test.with_config(caps: [policy_text_bytes: 8])
     {:ok, config} = Config.resolve()
-    version = Version.of(Mediate.Rbac, Roles, config, DateTime.utc_now())
-    assert version.content == nil
-    assert version.pointer == "modules #{inspect(Predicates)}, #{inspect(Roles)}"
+    release = Version.release(Mediate.Rbac, Reference, config, DateTime.utc_now())
+    assert release.text == nil
+    assert release.text_location == "modules #{inspect(Predicates)}, #{inspect(Reference)}"
   end
 
-  test "publish emits the bound policy's version, once per call" do
-    :telemetry.attach(inspect(self()), Version.telemetry_event(), &__MODULE__.forward/4, self())
+  test "release publishes the bound policy's release, once per call" do
+    :telemetry.attach(inspect(self()), PolicyRelease.event(), &__MODULE__.forward/4, self())
 
-    assert {:ok, %PolicyVersion{} = version} = Mediate.Rbac.publish()
-    assert version.adapter == Mediate.Rbac
-    assert version.version == "conformance"
-    assert version.content =~ "  reader: read\n"
+    assert {:ok, %PolicyRelease{} = release} = Mediate.Rbac.release()
+    assert release.engine == Mediate.Rbac
+    assert release.policy_version == "conformance"
+    assert release.text =~ "  reader: read\n"
 
-    assert_receive {:policy_version, %{version: ^version}}
-    refute_receive {:policy_version, _later}
+    assert_receive {:policy_release, %{release: ^release}}
+    refute_receive {:policy_release, _later}
   after
     :telemetry.detach(inspect(self()))
   end
 
-  test "a policy that names another version publishes under that one" do
-    assert {:ok, %PolicyVersion{version: "conformance"}} = Mediate.Rbac.publish()
+  test "a policy that names another version releases under that one" do
+    assert {:ok, %PolicyRelease{policy_version: "conformance"}} = Mediate.Rbac.release()
     :ok = Binding.override(policy: Mediate.Rbac.VersionTest.Later)
 
-    assert {:ok, %PolicyVersion{version: "later"}} = Mediate.Rbac.publish()
+    assert {:ok, %PolicyRelease{policy_version: "later"}} = Mediate.Rbac.release()
   end
 
-  test "the default version is the content hash" do
+  test "the default version is the text hash" do
     :ok = Binding.override(policy: Mediate.Rbac.VersionTest.Unversioned)
 
-    assert Version.ref(Mediate.Rbac.VersionTest.Unversioned) ==
-             Version.content_hash(Mediate.Rbac.VersionTest.Unversioned)
+    assert Version.policy_version(Mediate.Rbac.VersionTest.Unversioned) ==
+             Version.text_hash(Mediate.Rbac.VersionTest.Unversioned)
   end
 
   @doc false
   @spec forward([atom()], map(), map(), pid()) :: :ok
   def forward(_event, _measurements, metadata, pid) do
-    send(pid, {:policy_version, metadata})
+    send(pid, {:policy_release, metadata})
     :ok
   end
 

@@ -8,7 +8,7 @@ defmodule Mediate.Rbac.MixProject do
     [
       app: :mediate_rbac,
       version: @version,
-      description: "RBAC in code for Mediate: an authorization adapter whose rules are Elixir modules.",
+      description: "Roles in code for Mediate: an authorization engine whose policy is an Elixir module.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",
@@ -65,9 +65,9 @@ defmodule Mediate.Rbac.MixProject do
 
   # lib depends on the library, ecto, and telemetry alone. ecto_sql and
   # postgrex serve the test run, as the conformance package and stream_data
-  # do: an adopter of this adapter proves it and does not ship the proof.
+  # do: a deployment of this engine proves it and does not ship the proof.
   # Each published requirement is compatible rather than exact, so an
-  # adopter already on a later patch can install this package, and mix.lock
+  # deployment already on a later patch can install this package, and mix.lock
   # holds the version and the checksum this repository builds against.
   # Versions verified against https://hex.pm/api/packages/<name> on
   # 2026-09-08.
@@ -100,7 +100,7 @@ defmodule Mediate.Rbac.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      extras: ["README.md": [title: "Mediate RBAC in code"]]
+      extras: ["README.md": [title: "Mediate roles in code"]]
     ]
   end
 

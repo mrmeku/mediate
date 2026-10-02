@@ -5,10 +5,10 @@ defmodule Mediate.Infrastructure.Surface do
   # The repo template of `mediate_conformance` diffs it against a compiled
   # Repo's exports, so a release that adds a function fails that test by name.
   #
-  # - *query*: `prepare_query/3` judges it, and the seam wraps it.
-  # - *write*: the seam overrides it. It judges, records, and wraps.
-  # - *raw*: the seam wraps it to demand an exemption.
-  # - *plumbing*: it touches no rows, and the seam leaves it alone.
+  # - *query*: `prepare_query/3` judges it, and the mediated repo wraps it.
+  # - *write*: the mediated repo overrides it. It judges, records, and wraps.
+  # - *raw*: the mediated repo wraps it to demand an exemption.
+  # - *plumbing*: it touches no rows, and the mediated repo leaves it alone.
   #
   # The list also holds the shorter arities that default arguments generate.
   # So an override that redeclares `opts \\ []` covers every arity the Repo
@@ -125,11 +125,11 @@ defmodule Mediate.Infrastructure.Surface do
   @spec query() :: [entry()]
   def query, do: @query
 
-  @doc "The functions the seam overrides."
+  @doc "The functions the mediated repo overrides."
   @spec write() :: [entry()]
   def write, do: @write
 
-  @doc "The functions the seam wraps to demand an exemption."
+  @doc "The functions the mediated repo wraps to demand an exemption."
   @spec raw() :: [entry()]
   def raw, do: @raw
 

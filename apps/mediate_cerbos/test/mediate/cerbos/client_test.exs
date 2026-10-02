@@ -10,55 +10,48 @@ defmodule Mediate.Cerbos.ClientTest do
   @resource %{kind: "folder", id: "1", attr: %{"member_roles" => ["reader"]}}
 
   setup do
-    :telemetry.attach(inspect(self()), Client.telemetry_event(), &__MODULE__.forward/4, self())
+    :telemetry.attach(inspect(self()), Client.event(), &__MODULE__.forward/4, self())
     on_exit(fn -> :telemetry.detach(inspect(self())) end)
-    {:ok, address: Dev.Cerbos.info().address}
+    {:ok, address: Dev.Cerbos.current!().http}
   end
 
   test "a decision over resources answers the effect per action, with the policy it matched", ctx do
-    assert {:ok, answered} = Client.check_resources(ctx.address, Request.logged(@principal, @resource, ["read"]))
+    assert {:ok, answered} = Client.check_resources(ctx.address, Request.inline(@principal, @resource, ["read"]))
     assert [result] = answered["results"]
     assert result["resource"] == %{"kind" => "folder", "id" => "1"}
     assert result["actions"]["read"] == "EFFECT_ALLOW"
     assert result["meta"]["actions"]["read"]["matchedPolicy"] =~ "folder"
 
-    assert_receive {:request, %{duration: duration}, %{path: "/api/check/resources", outcome: :ok}}
+    address = ctx.address
+    assert_receive {:request, %{duration: duration}, %{address: ^address, path: "/api/check/resources", outcome: :ok}}
     assert duration > 0
   end
 
-  test "a query plan answers the filter over the attributes it could not resolve", ctx do
-    body = %{
-      requestId: "plan",
-      includeMeta: true,
-      principal: @principal,
-      resource: %{kind: "folder"},
-      action: "read"
-    }
+  test "a plan answers the filter over the attributes the server could not resolve", ctx do
+    body = Request.plan({:user, "an-account"}, :read, :folder, %{"clearance" => "cleared"})
 
     assert {:ok, answered} = Client.plan_resources(ctx.address, body)
     assert answered["filter"]["kind"] == "KIND_CONDITIONAL"
     assert_receive {:request, _measurements, %{path: "/api/plan/resources", outcome: :ok}}
   end
 
-  test "the server answers what it is and that it is serving", ctx do
-    assert Client.serving?(ctx.address)
+  test "the server answers what it is and that it is healthy", ctx do
+    assert Client.healthy?(ctx.address)
     assert {:ok, info} = Client.server_info(ctx.address)
     assert is_binary(info["version"])
     assert_receive {:request, _measurements, %{path: "/api/server_info", outcome: :ok}}
   end
 
-  test "a body the server refuses is the status and what it said" do
-    address = Dev.Cerbos.info().address
-
-    assert {:error, detail} = Client.check_resources(address, %{requestId: "empty"})
-    assert detail =~ "cerbos answered 400"
+  test "a body the server refuses is the status and what it said", ctx do
+    assert {:error, message} = Client.check_resources(ctx.address, %{requestId: "empty"})
+    assert message =~ "the Cerbos server at #{ctx.address} answered 400"
     assert_receive {:request, _measurements, %{path: "/api/check/resources", outcome: :error}}
   end
 
-  test "a sidecar out of reach is a failure rather than a wait" do
-    refute Client.serving?(@dead)
-    assert {:error, detail} = Client.plan_resources(@dead, %{requestId: "dead"})
-    assert detail =~ "cerbos could not be reached"
+  test "a server out of reach is a failure rather than a wait" do
+    refute Client.healthy?(@dead)
+    assert {:error, message} = Client.plan_resources(@dead, %{requestId: "dead"})
+    assert message =~ "the Cerbos server at #{@dead} could not be reached"
     assert_receive {:request, _measurements, %{path: "/api/plan/resources", outcome: :error}}
   end
 

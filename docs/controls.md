@@ -1,18 +1,18 @@
 # Controls
 
-*Which NIST line does each law, guarantee, and scenario answer? For an assessor.*
+*Which NIST line does each requirement and scenario answer? For an assessor.*
 
 The lines are NIST SP 800-53 Rev 5 controls as the FedRAMP Rev 5 Moderate baseline selects and parameterizes them. The selections and parameter values come from the OSCAL profile `FedRAMP_rev5_MODERATE-baseline_profile.json`, read on 2026-09-14 in the oscal-compass-lab mirror of GSA's fedramp-automation repository. The control text comes from the csf.tools mirror of the Rev 5 catalog. A control cited with an asterisk in `docs/example.md` is outside the baseline, and no control in the baseline asks for a reference monitor.
 
-A law is a row of `docs/conformance.md` under "The laws", and a guarantee is a row under "The guarantees". A scenario is a row of `docs/example.md` under "The scenarios".
+A requirement is a row of `docs/conformance.md` under "The engine requirements" or "The repo requirements". A scenario is a row of `docs/example.md` under "The scenarios".
 
 ## The parameters
 
 | Parameter | Value | What it means here |
 |---|---|---|
-| AU-2 `au-02_odp.01` | ends "For Web applications: all administrator activity, authentication checks, authorization checks, data deletions, data access, data changes, and permission changes" | authorization checks are the decision event. Data access is the access event. Data changes, deletions, and permission changes are the change event. Administrator activity is a decision or change whose subject kind is `:privileged`. Authentication checks are the application's, outside the library |
-| AU-3(1) `au-03.01_odp` | includes "characteristics that describe or identify the object or resource being acted upon" | every event carries the object type and the ids it acted on |
-| AC-2(4) | "Automatically audit account creation, modification, enabling, disabling, and removal actions" | a single-row write to a schema audited as `:user` emits one change event |
+| AU-2 `au-02_odp.01` | ends "For Web applications: all administrator activity, authentication checks, authorization checks, data deletions, data access, data changes, and permission changes" | authorization checks are the decision event. Data access is the resource read event. Data changes, deletions, and permission changes are the identity write event. Administrator activity is a decision or identity write whose subject kind is `:privileged`. Authentication checks are the application's, outside the library |
+| AU-3(1) `au-03.01_odp` | includes "characteristics that describe or identify the object or resource being acted upon" | every event carries the resource type and the primary keys it acted on |
+| AC-2(4) | "Automatically audit account creation, modification, enabling, disabling, and removal actions" | a single-row write to an identity schema of kind `:account` emits one identity write event |
 | AC-6(9) | "Log the execution of privileged functions" | every decision for a `:privileged` subject carries that kind |
 
 ## The controls
@@ -38,13 +38,13 @@ A law is a row of `docs/conformance.md` under "The laws", and a guarantee is a r
 | AU-3 | `au3-02` |
 | AU-3 | `au3-03` |
 | AU-3(1) | `au3-04` |
-| AU-12, AC-2(4) | `au12-01`, `E1` |
-| AU-12 | `au12-02`, `E2` |
-| AU-12 | `au12-03`, `E3` |
+| AU-12, AC-2(4) | `au12-01`, `repo-01` |
+| AU-12 | `au12-02`, `repo-02` |
+| AU-12 | `au12-03`, `repo-03` |
 | AU-12 | `au12-04` |
 | AU-12 | `au12-05` |
-| AU-12 | `au12-06`, `E5` |
-| AU-12 | `au12-07`, one coverage test per adapter |
+| AU-12 | `au12-06`, `repo-05` |
+| AU-12 | `au12-07`, one coverage test per engine package |
 | CM-3, CM-5 | `cm3-01` |
 | CM-3(2) | `cm3-02` |
 | CM-5(1) | `cm3-03` |
@@ -67,4 +67,4 @@ The library emits what these need, and the deployer's consumer satisfies them.
 | CM-3(4), CM-5(5) | Puts a security representative on the change board and limits who can publish a version |
 | AU-5 | Alerts on a handler failure, which telemetry reports as its own event |
 
-A row is complete when it names a law, a guarantee, a scenario, or a consumer responsibility, and the freeze test holds the law ids.
+A row is complete when it names a requirement, a scenario, or a consumer responsibility, and the freeze test holds the requirement ids.

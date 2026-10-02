@@ -1,5 +1,5 @@
 defmodule Mediate.Infrastructure.Option do
-  # The `mediate:` option resolved against the process the call runs in.
+  # The `authorized_by:` option resolved against the process the call runs in.
   # That is the repo's role, the caller the stack names, and the ambient
   # mediation a nested call reuses. `Mediate.Domain.Mediation` says what the
   # option means. This module reads what only the running process can tell,
@@ -20,7 +20,7 @@ defmodule Mediate.Infrastructure.Option do
     if repo.__mediate__(:role) == :owner do
       put(Mediation.library(call, root, repo), opts)
     else
-      given(repo, {name, arity}, root, opts, Keyword.fetch(opts, :mediate))
+      given(repo, {name, arity}, root, opts, Keyword.fetch(opts, :authorized_by))
     end
   end
 
@@ -53,7 +53,7 @@ defmodule Mediate.Infrastructure.Option do
     end
   end
 
-  defp put(%Mediation{} = mediation, opts), do: {mediation, Keyword.put(opts, :mediate, mediation)}
+  defp put(%Mediation{} = mediation, opts), do: {mediation, Keyword.put(opts, :authorized_by, mediation)}
 
   defp restore(nil), do: Process.delete(__MODULE__)
   defp restore(%Mediation{} = previous), do: Process.put(__MODULE__, previous)
@@ -68,7 +68,7 @@ defmodule Mediate.Infrastructure.Option do
     else
       {name, arity} = call
 
-      raise Mediation.unmediated(
+      raise Mediation.decision_missing(
               function: name,
               arity: arity,
               schema: schema_of(root),
@@ -78,7 +78,8 @@ defmodule Mediate.Infrastructure.Option do
     end
   end
 
-  defp settled(repo, call, root, {:exempt, reason}), do: Mediation.declared(call, root, Caller.module(repo), reason)
+  defp settled(repo, call, root, {:exempt, justification}),
+    do: Mediation.declared(call, root, Caller.module(repo), justification)
 
   defp schema_of(root) when is_atom(root), do: root
   defp schema_of(_root), do: nil

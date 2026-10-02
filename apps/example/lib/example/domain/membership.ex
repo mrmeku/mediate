@@ -9,12 +9,12 @@ defmodule Example.Domain.Membership do
   @type t :: %__MODULE__{}
 
   schema "memberships" do
-    field(:user_id, :string)
+    field(:account_id, :string)
     field(:role, Ecto.Enum, values: [:maintainer, :contributor])
     belongs_to(:project, Project)
   end
 
-  object_type(:membership)
-  audited(:role)
-  relationship(subject: :user_id, object: :project_id, attributes: [:role])
+  resource_type(:membership)
+  identity(:role)
+  grant(subject: :account_id, resource: :project_id, attributes: [:role])
 end

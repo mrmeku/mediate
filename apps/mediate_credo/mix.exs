@@ -8,7 +8,7 @@ defmodule Mediate.Credo.MixProject do
     [
       app: :mediate_credo,
       version: @version,
-      description: "Two Credo checks that find the two ways an Ecto query leaves the Mediate seam.",
+      description: "Two Credo checks that flag the two ways a query reaches the database around the mediated repo.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",

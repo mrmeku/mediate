@@ -1,5 +1,5 @@
 defmodule Example.Domain.OverrideReport do
-  @moduledoc "One audited override, reported to the repository's owning team. No rule reads it."
+  @moduledoc "One audited override, reported to the repository's owning team. No clause reads it."
 
   use Ecto.Schema
 
@@ -9,10 +9,10 @@ defmodule Example.Domain.OverrideReport do
   @type t :: %__MODULE__{}
 
   schema "override_reports" do
-    field(:user_id, :string)
+    field(:account_id, :string)
     field(:justification, :string)
-    field(:operation_id, :string)
-    field(:at, :utc_datetime)
+    field(:correlation_id, :string)
+    field(:read_at, :utc_datetime)
     belongs_to(:repository, Repository)
     belongs_to(:team, Team)
   end

@@ -1,65 +1,60 @@
 defmodule Mediate.Rbac.Version do
   @moduledoc """
-  The policy version of RBAC in code. Its identifier is the `version:` the
-  policy module gave, or the content hash. The content hash is a digest of
-  the policy module and every module a predicate or a hop filter lives in.
-  So a change to a rule is a new version whether or not anyone said so. The
-  content is the role table and the module list as text when under the
-  configured cap, and a pointer to the modules otherwise.
-  [the events document](https://hexdocs.pm/mediate/events.html) under
-  "Policy version" has the event and the cap.
+  The policy version of roles in code. It is the `version:` the policy
+  module gave, or the text hash. The policy's text lists each module a
+  rule lives in, with the digest of its bytecode, and the role table. So a
+  change to a rule is a new version whether or not anyone said so. The
+  release carries the text by value when under the configured cap, and the
+  module list as its location otherwise. The events document under "Policy
+  release" has the event and the cap.
 
-  `Mediate.Rbac.publish/0` builds the version and emits `telemetry_event/0`
-  with it, one event per call. It stores nothing, so the consumer that
-  keeps a record of deployments handles that event.
+  `Mediate.Rbac.release/0` builds the release and publishes it, one event
+  per call. It stores nothing, so the consumer that keeps a record of
+  deployments handles that event.
   """
 
   alias Mediate.Config
-  alias Mediate.PolicyVersion
+  alias Mediate.PolicyRelease
   alias Mediate.Rbac.Policy
 
-  @telemetry [:mediate, :rbac, :policy_version]
+  @doc "The policy version a verdict names: the `version:` option, or the text hash."
+  @spec policy_version(Policy.t()) :: String.t()
+  def policy_version(policy) when is_atom(policy), do: Policy.options(policy)[:version] || text_hash(policy)
 
-  @doc "The telemetry event `Mediate.Rbac.publish/0` emits."
-  @spec telemetry_event() :: [atom()]
-  def telemetry_event, do: @telemetry
+  @doc "The sha256 of `text/1`, in lower-case hex."
+  @spec text_hash(Policy.t()) :: String.t()
+  def text_hash(policy) when is_atom(policy), do: Base.encode16(:crypto.hash(:sha256, text(policy)), case: :lower)
 
-  @doc "The version identifier a decision names."
-  @spec ref(Policy.t()) :: PolicyVersion.ref()
-  def ref(policy) when is_atom(policy), do: Policy.options(policy)[:version] || content_hash(policy)
+  @doc "The policy's text: each module with the digest of its bytecode, then the role table."
+  @spec text(Policy.t()) :: String.t()
+  def text(policy) when is_atom(policy) do
+    modules =
+      Enum.map_join(Policy.modules(policy), "", fn module ->
+        "  #{inspect(module)}: #{Base.encode16(module.module_info(:md5), case: :lower)}\n"
+      end)
 
-  @doc "The digest of the policy module and every predicate and hop filter module."
-  @spec content_hash(Policy.t()) :: String.t()
-  def content_hash(policy) when is_atom(policy) do
-    digest = Enum.map_join(Policy.modules(policy), "", &(&1.module_info(:md5) <> Atom.to_string(&1)))
-    Base.encode16(:crypto.hash(:sha256, digest), case: :lower)
-  end
-
-  @doc "The role table and the module list as text."
-  @spec content(Policy.t()) :: String.t()
-  def content(policy) when is_atom(policy) do
     roles =
-      Enum.map_join(Policy.table(policy), "", fn {name, permissions} -> "  #{name}: #{Enum.join(permissions, ", ")}\n" end)
+      Enum.map_join(Policy.role_table(policy), "", fn {name, actions} -> "  #{name}: #{Enum.join(actions, ", ")}\n" end)
 
-    "modules: #{Enum.map_join(Policy.modules(policy), ", ", &inspect/1)}\nroles:\n" <> roles
+    "modules:\n" <> modules <> "roles:\n" <> roles
   end
 
-  @doc "The version of `adapter` as an event carries it, with the content by value when under the cap."
-  @spec of(module(), Policy.t(), Config.t(), DateTime.t()) :: PolicyVersion.t()
-  def of(adapter, policy, %Config{caps: caps}, %DateTime{} = at) when is_atom(adapter) and is_atom(policy) do
+  @doc "The release of `engine` as the event carries it, with the text by value when under the cap."
+  @spec release(module(), Policy.t(), Config.t(), DateTime.t()) :: PolicyRelease.t()
+  def release(engine, policy, %Config{caps: caps}, %DateTime{} = released_at) when is_atom(engine) and is_atom(policy) do
     options = Policy.options(policy)
-    text = content(policy)
-    under_cap? = byte_size(text) <= caps[:policy_content_bytes]
+    text = text(policy)
+    under_cap? = byte_size(text) <= caps[:policy_text_bytes]
 
-    %PolicyVersion{
-      adapter: adapter,
-      version: ref(policy),
-      content_hash: content_hash(policy),
-      content: if(under_cap?, do: text),
-      pointer: if(under_cap?, do: nil, else: "modules " <> Enum.map_join(Policy.modules(policy), ", ", &inspect/1)),
+    %PolicyRelease{
+      engine: engine,
+      policy_version: policy_version(policy),
+      text_hash: text_hash(policy),
+      text: if(under_cap?, do: text),
+      text_location: if(under_cap?, do: nil, else: "modules " <> Enum.map_join(Policy.modules(policy), ", ", &inspect/1)),
       author: options[:author],
       approval: options[:approval],
-      at: at
+      released_at: released_at
     }
   end
 end

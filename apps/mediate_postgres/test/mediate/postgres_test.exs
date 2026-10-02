@@ -2,7 +2,6 @@ defmodule Mediate.PostgresTest do
   use ExUnit.Case, async: true
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Mediate.Answer
   alias Mediate.Decision
   alias Mediate.Error
   alias Mediate.Fixture.Account
@@ -13,99 +12,93 @@ defmodule Mediate.PostgresTest do
   alias Mediate.Postgres
   alias Mediate.Postgres.Binding
   alias Mediate.Postgres.Catalog
-  alias Mediate.Postgres.Conformance.Rules
+  alias Mediate.Postgres.Conformance.Reference
+  alias Mediate.Postgres.Domain.Settings
   alias Mediate.Postgres.Infrastructure.Session
-  alias Mediate.Postgres.Infrastructure.Settings
   alias Mediate.TestRepos.Sandboxed
+  alias Mediate.Verdict
 
   @schemas [Account, Folder, Item, Membership]
   @subject {:user, "account-1"}
-  @object {:folder, 1}
+  @resource {:folder, 1}
 
-  test "the declaration: no scope cap, and a replica lag the adapter cannot measure" do
-    assert Postgres.scope_cap() == :none
+  test "the declaration: no filter limit, and a replica lag the engine does not measure" do
+    assert Postgres.filter_limit() == :infinity
     assert Postgres.replica_lag() == "not measured"
   end
 
-  test "with nothing bound every callback answers an engine error naming the callback" do
-    assert {:error, %Error{reason: :engine_unreachable, detail: detail}} =
-             Postgres.decide(@subject, :read, @object, environment(), [])
+  test "with nothing bound every callback answers an engine failure naming the callback" do
+    assert {:error, %Error{reason: :engine_failed, message: message}} =
+             Postgres.authorize(@subject, :read, @resource, context(), [])
 
-    assert detail == "#{inspect(Postgres)} failed during decide: invalid binding: nothing bound and no override"
+    assert message ==
+             "#{inspect(Postgres)} failed during authorize: invalid binding: nothing bound and no override; " <>
+               "call Mediate.Postgres.Binding.bind!/1 at boot"
 
-    assert {:error, %Error{reason: :engine_unreachable, detail: "Mediate.Postgres failed during scope" <> _rest}} =
-             Postgres.scope(@subject, :read, :folder, environment(), [])
+    assert {:error, %Error{reason: :engine_failed, message: "Mediate.Postgres failed during filter" <> _rest}} =
+             Postgres.filter(@subject, :read, :folder, context(), [])
 
-    assert_raise Error, fn -> Postgres.load!() end
+    assert {:error, %Error{reason: :invalid}} = Postgres.load_catalog()
+    assert_raise Error, fn -> Postgres.load_catalog!() end
   end
 
-  test "load! reads the catalog once, and a second call reads nothing" do
+  test "load_catalog reads the catalog and keeps it, and a call on the request path reads nothing" do
     bind()
 
-    assert %Catalog{version: version, policies: [_policy | _rest]} = Postgres.load!()
-    assert version == to_string(Rules.version())
-    assert Postgres.load!() == Postgres.load!()
+    assert {:ok, %Catalog{policy_version: policy_version, rules: [_rule | _rest]}} = Postgres.load_catalog()
+    assert policy_version == to_string(Reference.version())
+    assert Postgres.load_catalog!() == Postgres.load_catalog!()
   end
 
-  test "reload! reads the catalog again, for an application that ran a migration after boot" do
-    assert_raise Error, fn -> Postgres.reload!() end
+  test "a catalog the engine cannot read is an engine failure naming the callback" do
+    bind(migration_source: "mediate_no_such_table")
 
+    assert {:error, %Error{reason: :engine_failed, message: message}} =
+             Postgres.authorize(@subject, :read, @resource, context(), [])
+
+    assert message =~ "Mediate.Postgres failed during authorize: catalog read failed"
+    assert message =~ "mediate_no_such_table"
+  end
+
+  test "a resource type no bound schema declares matches no rule, and the verdict names the type" do
     bind()
 
-    assert %Catalog{policies: [_policy | _rest]} = reloaded = Postgres.reload!()
-    assert Postgres.load!() == reloaded
+    assert {:ok, %Verdict{effect: :deny, reason: :no_rule_matched, meta: %{resource_type: :no_such_type}}} =
+             Postgres.authorize(@subject, :read, {:no_such_type, 1}, context(), [])
   end
 
-  test "a catalog the engine cannot read is an engine error naming the callback" do
-    bind(migrations_table: "mediate_no_such_table")
-
-    assert {:error, %Error{reason: :engine_unreachable, detail: detail}} =
-             Postgres.decide(@subject, :read, @object, environment(), [])
-
-    assert detail =~ "Mediate.Postgres failed during decide"
-    assert detail =~ "mediate_no_such_table"
-  end
-
-  test "an object type no bound schema declares is denied by default" do
+  test "an action with no filter rule on the type is unknown to the filter" do
     bind()
 
-    assert {:ok, %Answer{verdict: :deny, reason: :deny_by_default}} =
-             Postgres.decide(@subject, :read, {:no_such_type, 1}, environment(), [])
+    assert {:ok, {_rule, %Verdict{effect: :deny, reason: :action_unknown}}} =
+             Postgres.filter(@subject, :publish, :folder, context(), [])
   end
 
-  test "an operation with no policy on the type denies the scope" do
+  test "a filter names the rule and the hash of the settings the database will read" do
     bind()
+    settings = Settings.new(@subject, :read, context())
 
-    assert {:ok, {_rule, %Answer{verdict: :deny, reason: :unknown_operation}}} =
-             Postgres.scope(@subject, :publish, :folder, environment(), [])
-  end
+    assert {:ok, {_rule, %Verdict{effect: :allow} = verdict}} = Postgres.filter(@subject, :read, :folder, context(), [])
 
-  test "a scope names the policy and the hash of the settings the database will read" do
-    bind()
-    settings = Settings.of(@subject, :read, environment())
-
-    assert {:ok, {_rule, %Answer{verdict: :allow} = answer}} =
-             Postgres.scope(@subject, :read, :folder, environment(), [])
-
-    assert answer.reason == :allowed
-    assert answer.meta.rule == "mediate_scope_read settings sha256:#{Settings.hash(settings)}"
+    assert verdict.reason == :rule_allowed
+    assert verdict.meta == %{rule: "mediate_filter_read", settings_hash: Settings.hash(settings)}
     assert Session.recall(@subject, :read) == settings
   end
 
   test "around_query runs the settings of the call that produced the decision" do
     bind()
-    settings = Settings.of(@subject, :read, environment())
+    settings = Settings.new(@subject, :read, context())
     :ok = Session.remember(@subject, :read, settings)
 
     assert Postgres.around_query(Folder, decision(), fn -> setting("mediate.subject_id") end) == "account-1"
   end
 
-  test "the session keeps one slot per subject and operation, so a review recalls every subject's call" do
+  test "the session keeps one slot per subject and action, so a review recalls every subject's call" do
     bind()
     other = {:user, "account-2"}
-    facts = Map.put(environment(), :clearance, "cleared")
-    mine = Settings.of(@subject, :read, facts)
-    theirs = Settings.of(other, :read, facts)
+    facts = Map.put(context(), :clearance, "cleared")
+    mine = Settings.new(@subject, :read, facts)
+    theirs = Settings.new(other, :read, facts)
     :ok = Session.remember(@subject, :read, mine)
     :ok = Session.remember(other, :read, theirs)
 
@@ -117,7 +110,7 @@ defmodule Mediate.PostgresTest do
   test "around_query with the call out of reach sets what the decision alone determines" do
     bind()
 
-    assert Postgres.around_query(Folder, decision(), fn -> setting("mediate.operation") end) == "read"
+    assert Postgres.around_query(Folder, decision(), fn -> setting("mediate.action") end) == "read"
   end
 
   test "around_query with nothing bound runs the function and sets nothing" do
@@ -138,7 +131,7 @@ defmodule Mediate.PostgresTest do
     assert setting("mediate.subject_id") == ""
   end
 
-  defp environment(facts \\ %{}) do
+  defp context(facts \\ %{}) do
     Map.put(facts, :now, ~U[2026-09-08 12:00:00Z])
   end
 
@@ -146,19 +139,21 @@ defmodule Mediate.PostgresTest do
     %Decision{
       id: Id.new(),
       subject: subject,
-      object: {:folder, 1},
-      operation: :read,
-      verdict: :allow,
-      reason: :allowed,
-      adapter: Postgres,
+      resource: {:folder, 1},
+      action: :read,
+      effect: :allow,
+      reason: :rule_allowed,
+      engine: Postgres,
       policy_version: nil,
-      operation_id: Id.new(),
-      at: ~U[2026-09-08 12:00:00Z]
+      correlation_id: Id.new(),
+      decided_at: ~U[2026-09-08 12:00:00Z]
     }
   end
 
   defp setting(name) do
-    %{rows: [[value]]} = Sandboxed.query!("SELECT current_setting($1, true)", [name], mediate: {:exempt, "test"})
+    %{rows: [[value]]} =
+      Sandboxed.query!("SELECT current_setting($1, true)", [name], authorized_by: {:exempt, "test"})
+
     value
   end
 

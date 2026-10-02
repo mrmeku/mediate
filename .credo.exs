@@ -130,12 +130,14 @@
           {Credo.Check.Warning.UnusedStringOperation, []},
           {Credo.Check.Warning.UnusedTupleOperation, []},
           {Credo.Check.Warning.WrongTestFilename, []},
-          # Raw SQL bypasses the seam. The test cluster creates roles and
-          # databases through it, and it is the one module the check allows.
-          {Mediate.Credo.NoRawSQL, [files: %{included: ["lib/", "apps/*/lib/"]}, allow: ["Mediate.Dev.Cluster"]]},
-          # The repos of the test tools carry no seam. They prove the cluster
+          # Raw SQL reaches the database around the mediated repo. The test
+          # cluster creates roles and databases through it, and it is the one
+          # module the check skips.
+          {Mediate.Credo.Check.Warning.RawSQL,
+           [files: %{included: ["lib/", "apps/*/lib/"]}, excluded_namespaces: ["Mediate.Dev.Cluster"]]},
+          # The repos of the test tools are unmediated. They prove the cluster
           # and the dump, and the package does not depend on the library.
-          {Mediate.Credo.UnmediatedRepo,
+          {Mediate.Credo.Check.Warning.UnmediatedRepo,
            [files: %{excluded: ["test/support/mediate/dev/", "apps/mediate_dev/test/support/mediate/dev/"]}]}
         ],
         disabled: [

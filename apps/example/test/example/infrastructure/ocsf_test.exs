@@ -1,57 +1,59 @@
-defmodule Example.Infrastructure.OcsfTest do
+defmodule Example.Infrastructure.OCSFTest do
   use ExUnit.Case, async: true
 
   import Ecto.Query, only: [dynamic: 2]
 
-  alias Example.Infrastructure.Ocsf
+  alias Example.Infrastructure.OCSF
 
   @now ~U[2026-09-08 12:00:00Z]
 
-  @change %{
+  @identity_write %{
     operation: :update,
-    kind: :role,
-    target: {:role, 7},
+    identity_kind: :role,
+    resource: {:role, 7},
     changes: %{role: {:contributor, :admin}},
-    actor: {:privileged, "gil"},
-    actor_kind: :privileged,
-    time: @now,
-    operation_id: "op-1",
+    subject: {:privileged, "gil"},
+    subject_kind: :privileged,
+    decision_id: nil,
+    written_at: @now,
+    correlation_id: "op-1",
     schema: Example.Domain.Membership
   }
 
   @decision %{
     subject: {:user, "ann"},
     subject_kind: :user,
-    operation: :read,
-    object: {:repository, 4},
-    verdict: :allow,
-    reason: :allowed,
-    decider: Mediate.Test.Fake,
-    version: "fake",
-    env: %{},
+    action: :read,
+    resource: {:repository, 4},
+    effect: :allow,
+    reason: :rule_allowed,
+    engine: Mediate.Test.Fake,
+    policy_version: "fake",
+    context: %{},
     exception: nil,
-    time: @now,
-    operation_id: "op-1"
+    decision_id: "dec-1",
+    decided_at: @now,
+    correlation_id: "op-1"
   }
 
-  @access %{
-    object_type: :repository,
+  @resource_read %{
+    resource_type: :repository,
     schema: Example.Domain.Repository,
     repo: Example.Infrastructure.Repo,
-    call: {:get, 3},
-    activity: :read,
-    ids: [4],
+    repo_function: {:get, 3},
+    cardinality: :one,
+    primary_keys: [4],
     count: 1,
-    shape: :rows,
+    result_shape: :rows,
     subject: {:user, "ann"},
     subject_kind: :user,
     decision_id: "dec-1",
-    time: @now,
-    operation_id: "op-1"
+    read_at: @now,
+    correlation_id: "op-1"
   }
 
-  test "a change event maps to the OCSF class of its kind and the activity of its operation" do
-    record = Ocsf.change(@change)
+  test "an identity write maps to the OCSF class of its identity kind and the activity of its operation" do
+    record = OCSF.identity_write(@identity_write)
 
     assert {record.category_uid, record.class_uid, record.class_name} == {3, 3005, "User Access Management"}
     assert {record.activity_id, record.activity_name} == {3, "Update"}
@@ -61,7 +63,7 @@ defmodule Example.Infrastructure.OcsfTest do
     assert record.entity == %{type: "role", uid: "7"}
 
     assert record.metadata == %{
-             version: Ocsf.version(),
+             version: OCSF.version(),
              product: %{name: "Example", vendor_name: "Mediate"},
              correlation_uid: "op-1"
            }
@@ -70,18 +72,18 @@ defmodule Example.Infrastructure.OcsfTest do
     assert record.unmapped.schema == "Example.Domain.Membership"
   end
 
-  test "each kind has its class and each operation its activity" do
-    for {kind, class} <- [user: 3001, group: 3006, role: 3005, entity: 3004] do
-      assert Ocsf.change(%{@change | kind: kind}).class_uid == class
+  test "each identity kind has its class and each operation its activity" do
+    for {kind, class} <- [account: 3001, group: 3006, role: 3005, other: 3004] do
+      assert OCSF.identity_write(%{@identity_write | identity_kind: kind}).class_uid == class
     end
 
     for {operation, activity} <- [create: 1, update: 3, delete: 4] do
-      assert Ocsf.change(%{@change | operation: operation}).activity_id == activity
+      assert OCSF.identity_write(%{@identity_write | operation: operation}).activity_id == activity
     end
   end
 
-  test "a decision maps to an API activity whose status is the verdict and whose duration is the call's" do
-    record = Ocsf.decision(@decision, 125)
+  test "a decision maps to an API activity whose status is the effect and whose duration is the call's" do
+    record = OCSF.decision(@decision, 125)
 
     assert {record.category_uid, record.class_uid, record.class_name} == {6, 6003, "API Activity"}
     assert {record.activity_id, record.activity_name} == {2, "Read"}
@@ -90,30 +92,31 @@ defmodule Example.Infrastructure.OcsfTest do
     assert record.duration == 125
     assert record.actor == %{user: %{uid: "ann", type_id: 1, type: "User"}}
     assert record.resource == %{type: "repository", uid: "4"}
-    assert record.api == %{operation: "read", response: %{message: "allowed"}}
-    assert record.unmapped.decider == "Mediate.Test.Fake"
+    assert record.api == %{operation: "read", response: %{message: "rule_allowed"}}
+    assert record.unmapped.engine == "Mediate.Test.Fake"
     assert record.unmapped.policy_version == "fake"
+    assert record.unmapped.decision_id == "dec-1"
   end
 
-  test "a denial is a failure of low severity, an unnumbered operation is other, and a narrowing call is a query that succeeded" do
-    denied = Ocsf.decision(%{@decision | verdict: :deny, reason: :deny_by_default, operation: :change_visibility}, 1)
+  test "a deny is a failure of low severity, an unnumbered action is other, and a filter is a query that succeeded" do
+    denied = OCSF.decision(%{@decision | effect: :deny, reason: :no_rule_matched, action: :change_visibility}, 1)
 
     assert {denied.status_id, denied.status, denied.severity_id} == {2, "Failure", 2}
     assert {denied.activity_id, denied.activity_name} == {99, "Other"}
     assert denied.api.operation == "change_visibility"
-    assert denied.api.response.message == "deny_by_default"
+    assert denied.api.response.message == "no_rule_matched"
 
-    narrowed = Ocsf.decision(%{@decision | verdict: :scoped, object: dynamic([row], row.id == 1)}, 1)
-    assert narrowed.resource == %{type: "query", uid: nil}
-    assert {narrowed.status_id, narrowed.status, narrowed.severity_id} == {1, "Success", 1}
+    filtered = OCSF.decision(%{@decision | effect: :filter, resource: dynamic([row], row.id == 1)}, 1)
+    assert filtered.resource == %{type: "query", uid: nil}
+    assert {filtered.status_id, filtered.status, filtered.severity_id} == {1, "Success", 1}
 
-    raised = Ocsf.decision(%{@decision | verdict: :deny, reason: nil, exception: %RuntimeError{}}, 1)
-    assert raised.unmapped.exception == "RuntimeError"
-    assert raised.api.response.message == nil
+    failed = OCSF.decision(%{@decision | effect: :deny, reason: nil, exception: %RuntimeError{}}, 1)
+    assert failed.unmapped.exception == "RuntimeError"
+    assert failed.api.response.message == nil
   end
 
-  test "an access event maps to a datastore activity of the table its object type names, read or query" do
-    record = Ocsf.access(@access)
+  test "a resource read maps to a datastore activity of the table its resource type names, read or query" do
+    record = OCSF.resource_read(@resource_read)
 
     assert {record.category_uid, record.class_uid, record.class_name} == {6, 6005, "Datastore Activity"}
     assert {record.activity_id, record.activity_name} == {1, "Read"}
@@ -124,21 +127,22 @@ defmodule Example.Infrastructure.OcsfTest do
     assert record.database == %{name: "Example.Infrastructure.Repo"}
     assert record.table == %{name: "repository"}
     assert record.metadata.correlation_uid == "op-1"
-    assert record.unmapped == %{ids: ["4"], count: 1, decision_id: "dec-1"}
+    assert record.unmapped == %{primary_keys: ["4"], count: 1, decision_id: "dec-1"}
 
-    queried = Ocsf.access(%{@access | activity: :query, ids: [], count: 0, shape: :value})
+    many = %{@resource_read | repo_function: {:all, 2}, cardinality: :many, primary_keys: [], count: 0}
+    queried = OCSF.resource_read(%{many | result_shape: :scalar})
     assert {queried.activity_id, queried.activity_name, queried.type_uid} == {4, "Query", 600_504}
-    assert queried.unmapped.ids == []
+    assert queried.unmapped.primary_keys == []
   end
 
-  test "an object asked about by its type alone carries no id" do
-    record = Ocsf.decision(%{@decision | object: {:repository, nil}}, 1)
+  test "a resource asked about by its type alone carries no id" do
+    record = OCSF.decision(%{@decision | resource: {:repository, nil}}, 1)
 
     assert record.resource == %{type: "repository", uid: nil}
   end
 
   test "a subject of a kind the mapping does not know is an unknown user" do
-    record = Ocsf.decision(%{@decision | subject: {:robot, "r2"}, subject_kind: :robot}, 1)
+    record = OCSF.decision(%{@decision | subject: {:robot, "r2"}, subject_kind: :robot}, 1)
 
     assert record.actor == %{user: %{uid: "r2", type_id: 0, type: "Unknown"}}
   end

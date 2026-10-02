@@ -1,5 +1,5 @@
 defmodule Mediate.Id do
-  @moduledoc "An identifier: a UUID string, the shape every subject, object, decision, and operation id has."
+  @moduledoc "An identifier: a UUID string, the shape every subject id, decision id, and correlation id has."
 
   alias Ecto.UUID
 

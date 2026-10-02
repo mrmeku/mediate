@@ -1,6 +1,6 @@
 defmodule Mediate.FreezeTest do
   @moduledoc """
-  The frozen lists of the port. The law and guarantee tables are frozen
+  The frozen lists of the library. The law and guarantee tables are frozen
   against `docs/conformance.md` by the freeze test of `mediate_conformance`.
   """
 
@@ -8,41 +8,45 @@ defmodule Mediate.FreezeTest do
 
   @moduletag :freeze
 
-  test "Mediate.Adapter has the frozen callbacks" do
-    assert Enum.sort(Mediate.Adapter.behaviour_info(:callbacks)) ==
+  test "Mediate.Engine has the frozen callbacks" do
+    assert Enum.sort(Mediate.Engine.behaviour_info(:callbacks)) ==
              Enum.sort(
-               decide: 5,
-               scope: 5,
+               authorize: 5,
+               filter: 5,
                around_query: 3,
                options_schema: 0,
-               scope_cap: 0,
-               settle: 0
+               filter_limit: 0,
+               sync: 0
              )
 
-    assert Enum.sort(Mediate.Adapter.behaviour_info(:optional_callbacks)) ==
-             Enum.sort(around_query: 3, options_schema: 0, settle: 0)
+    assert Enum.sort(Mediate.Engine.behaviour_info(:optional_callbacks)) ==
+             Enum.sort(around_query: 3, options_schema: 0, sync: 0)
   end
 
   test "the structs have the frozen fields" do
-    assert fields(Mediate.Answer) == ~w(meta reason verdict version)a
-    assert fields(Mediate.Exemption) == ~w(caller kind on reason)a
+    assert fields(Mediate.Verdict) == ~w(effect meta policy_version reason)a
+    assert fields(Mediate.Exemption) == ~w(caller declared_by justification source)a
 
     assert fields(Mediate.Decision) ==
-             ~w(adapter at id object operation operation_id policy_version reason subject verdict)a
+             ~w(action correlation_id decided_at effect engine id policy_version reason resource subject)a
 
-    assert fields(Mediate.Config) == ~w(adapter caps clock)a
+    assert fields(Mediate.PolicyRelease) ==
+             ~w(approval author engine policy_version released_at text text_hash text_location)a
+
+    assert fields(Mediate.Config) == ~w(caps clock engine)a
   end
 
-  test "the subject kinds and the reason lists are the frozen lists" do
-    assert Mediate.Port.subject_kinds() == [:user, :non_person_entity, :privileged]
+  test "the subject kinds, the effects, and the reason lists are the frozen lists" do
+    assert Mediate.subject_kinds() == [:user, :service, :privileged]
+    assert Mediate.Decision.effects() == [:allow, :deny, :filter]
 
-    assert Mediate.Answer.reasons() ==
-             ~w(allowed deny_by_default rule_denied engine_unreachable missing_fact unknown_operation
-                unknown_subject_kind)a
+    assert Mediate.Verdict.reasons() ==
+             ~w(rule_allowed no_rule_matched rule_denied engine_failed fact_missing action_unknown
+                subject_kind_unknown)a
 
     assert Mediate.Error.reasons() ==
-             ~w(deny_by_default rule_denied engine_unreachable missing_fact unknown_operation unknown_subject_kind
-                unsupported invalid unmediated)a
+             ~w(no_rule_matched rule_denied engine_failed fact_missing action_unknown subject_kind_unknown
+                unsupported invalid decision_missing)a
   end
 
   defp fields(module) do

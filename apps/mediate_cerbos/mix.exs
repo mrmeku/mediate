@@ -8,7 +8,7 @@ defmodule Mediate.Cerbos.MixProject do
     [
       app: :mediate_cerbos,
       version: @version,
-      description: "Cerbos for Mediate: an authorization adapter whose rules are policy files a sidecar reads.",
+      description: "Cerbos for Mediate: an authorization engine whose rules are policy files a Cerbos server reads.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",
@@ -32,13 +32,13 @@ defmodule Mediate.Cerbos.MixProject do
     [preferred_envs: [quality: :test]]
   end
 
-  # `:inets` carries `httpc`, the client this adapter asks the sidecar with.
+  # `:inets` carries `httpc`, the client this engine asks the server with.
   # It ships with OTP, so it has no pin.
   def application do
     [extra_applications: [:logger, :inets]]
   end
 
-  # `priv/conformance` holds the policies the sidecar reads under the
+  # `priv/conformance` holds the policy files the server reads under the
   # conformance suite. The compiler sees none of them, and an application
   # never reads them.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -57,8 +57,8 @@ defmodule Mediate.Cerbos.MixProject do
 
   # lib depends on the library, ecto, and telemetry alone. ecto_sql and
   # postgrex serve the test run, as the conformance package and stream_data
-  # do: an adopter of this adapter proves it and does not ship the proof.
-  # muontrap starts the sidecar the suite asks, through the test tools. Each
+  # do: a deployment of this engine proves it and does not ship the proof.
+  # muontrap starts the server the suite asks, through the test tools. Each
   # published requirement is compatible rather than exact, so an adopter
   # already on a later patch can install this package, and mix.lock holds
   # the version and the checksum this repository builds against. Versions

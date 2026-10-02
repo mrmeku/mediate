@@ -1,21 +1,23 @@
 defmodule Mediate.Dev.Cluster do
   @moduledoc """
-  One ephemeral Postgres cluster per `mix test` run, and per schema dump.
+  One Postgres cluster per `mix test` run, and one per structure dump.
 
   `start/1` takes about one second and does these steps in order:
 
   1. `initdb` into `tmp/pg-<random>/data` with `--auth=trust`.
   2. `pg_ctl start` on a unix socket alone, with no TCP port and
      `fsync=off`.
-  3. Create the roles: `mediate_owner`, which owns every table and runs the
-     migrations, and `mediate_app`, which the application connects as and
-     which carries `NOBYPASSRLS`.
-  4. Create the databases: `mediate_test` for the sandboxed tier and
-     `mediate_committed` for the committed tier.
+  3. Create the roles: `mediate_owner`, the owner role, which owns every
+     table and runs the migrations, and `mediate_app`, the app role, which
+     the application connects as and which carries `NOBYPASSRLS`.
+  4. Create the databases: `mediate_sandboxed`, the sandboxed database,
+     where every test runs in a transaction that rolls back, and
+     `mediate_durable`, the durable database, which keeps what a test
+     commits.
   5. Run the caller's `migrate:` function once per database, as the owner.
-  6. Put each repo's connection in the application env. This is the one
-     place in a test run that calls `Application.put_env`, and it runs
-     before any repo starts.
+  6. Put each repo's config in the application env. This is the one place
+     in a test run that calls `Application.put_env`, and it runs before any
+     repo starts.
   7. Start the caller's repos, and register `stop_all/1` with
      `ExUnit.after_suite/1` and `System.at_exit/1`. The cluster stops and
      its directory goes away when the suite ends, or at VM exit for a run
@@ -31,7 +33,7 @@ defmodule Mediate.Dev.Cluster do
 
   @owner "mediate_owner"
   @app "mediate_app"
-  @databases [sandboxed: "mediate_test", committed: "mediate_committed"]
+  @databases [sandboxed: "mediate_sandboxed", durable: "mediate_durable"]
   @initdb_user "postgres"
 
   # The host's libpq environment must not redirect any tool to another server.
@@ -43,7 +45,7 @@ defmodule Mediate.Dev.Cluster do
   @repo_schema NimbleOptions.new!(
                  role: [type: {:in, [:app, :owner]}, required: true, doc: "Which role the repo connects as."],
                  database: [
-                   type: {:in, [:sandboxed, :committed]},
+                   type: {:in, [:sandboxed, :durable]},
                    required: true,
                    doc: "Which database the repo connects to."
                  ],
@@ -56,7 +58,7 @@ defmodule Mediate.Dev.Cluster do
             repos: [
               type: {:list, {:custom, __MODULE__, :validate_repo, []}},
               required: true,
-              doc: "`{RepoModule, role: :app | :owner, database: :sandboxed | :committed}` per repo to start."
+              doc: "`{RepoModule, role: :app | :owner, database: :sandboxed | :durable}` per repo to start."
             ],
             migrate: [
               type: {:fun, 1},
@@ -77,7 +79,7 @@ defmodule Mediate.Dev.Cluster do
           supervisor: pid() | nil
         }
 
-  @type tier :: :sandboxed | :committed
+  @type database :: :sandboxed | :durable
   @type role :: :app | :owner
 
   @doc "Starts the cluster and the repos. Raises on any failure. Options: #{NimbleOptions.docs(@schema)}"
@@ -90,14 +92,14 @@ defmodule Mediate.Dev.Cluster do
     initdb!(cluster)
     pg_ctl!(cluster, ["start"])
     create_roles_and_databases!(cluster)
-    Enum.each(@databases, fn {_tier, database} -> migrate!(cluster, opts, database) end)
+    Enum.each(@databases, fn {_database, name} -> migrate!(cluster, opts, name) end)
     configure_repos!(cluster, opts)
     cluster = %{cluster | supervisor: start_repos!(opts)}
     :persistent_term.put(__MODULE__, [cluster | registered()])
     cluster
   end
 
-  @doc "Stops the server and removes the directory. Safe to call twice."
+  @doc "Stops the cluster and removes its directory. Safe to call twice."
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{} = cluster) do
     if is_pid(cluster.supervisor) and Process.alive?(cluster.supervisor), do: Supervisor.stop(cluster.supervisor)
@@ -111,23 +113,24 @@ defmodule Mediate.Dev.Cluster do
   @spec stop_all(term()) :: :ok
   def stop_all(_status), do: Enum.each(registered(), &stop/1)
 
-  @doc "The most recently started cluster, for tests that inspect it."
-  @spec info() :: t()
-  def info, do: hd(registered())
+  @doc "The cluster started last, for a test that inspects it."
+  @spec current() :: t()
+  def current, do: hd(registered())
 
-  @doc "The database name for a tier."
-  @spec database(tier()) :: String.t()
-  def database(tier) when tier in [:sandboxed, :committed], do: Keyword.fetch!(@databases, tier)
+  @doc "The Postgres name of a database."
+  @spec database_name(database()) :: String.t()
+  def database_name(database) when database in [:sandboxed, :durable], do: Keyword.fetch!(@databases, database)
 
-  @doc "The role name for a role."
-  @spec role(role()) :: String.t()
-  def role(:app), do: @app
-  def role(:owner), do: @owner
+  @doc "The Postgres name of a role."
+  @spec role_name(role()) :: String.t()
+  def role_name(:app), do: @app
+  def role_name(:owner), do: @owner
 
-  @doc "Connection options for a role and tier, as Postgrex and Ecto accept them."
-  @spec connection(t(), role(), tier()) :: keyword()
-  def connection(%__MODULE__{} = cluster, role, tier) when role in [:app, :owner] and tier in [:sandboxed, :committed] do
-    [socket_dir: cluster.socket_dir, username: role(role), database: database(tier)]
+  @doc "The config a repo starts with for a role and a database, as Postgrex and Ecto accept it."
+  @spec config(t(), role(), database()) :: keyword()
+  def config(%__MODULE__{} = cluster, role, database)
+      when role in [:app, :owner] and database in [:sandboxed, :durable] do
+    [socket_dir: cluster.socket_dir, username: role_name(role), database: database_name(database)]
   end
 
   @doc "Runs a SQL statement through `psql` as the superuser. Raises on failure."
@@ -196,25 +199,25 @@ defmodule Mediate.Dev.Cluster do
   defp create_roles_and_databases!(cluster) do
     statements =
       ["CREATE ROLE #{@owner} LOGIN", "CREATE ROLE #{@app} LOGIN NOBYPASSRLS"] ++
-        Enum.map(@databases, fn {_tier, database} -> "CREATE DATABASE #{database} OWNER #{@owner}" end)
+        Enum.map(@databases, fn {_database, name} -> "CREATE DATABASE #{name} OWNER #{@owner}" end)
 
     Enum.each(statements, &psql!(cluster, "postgres", &1))
   end
 
   # Migrations run through the first owner-role repo, pointed at each database
   # in turn with a dynamic instance. The repo's static instance starts later.
-  defp migrate!(cluster, opts, database) do
+  defp migrate!(cluster, opts, name) do
     case Enum.find(opts[:repos], fn {_repo, config} -> config[:role] == :owner end) do
       nil -> :ok
-      {repo, _config} -> on(cluster, repo, :owner, database, fn _pid -> :ok = opts[:migrate].(repo) end)
+      {repo, _config} -> on(cluster, repo, :owner, name, fn _pid -> :ok = opts[:migrate].(repo) end)
     end
   end
 
   # A dynamic instance of the repo on one database, in force on this process
   # for the length of the function and stopped after it.
-  defp on(cluster, repo, role, database, fun) do
-    connection = [socket_dir: cluster.socket_dir, username: role(role), database: database]
-    {:ok, pid} = repo.start_link([name: nil, pool_size: 2] ++ connection)
+  defp on(cluster, repo, role, name, fun) do
+    config = [socket_dir: cluster.socket_dir, username: role_name(role), database: name]
+    {:ok, pid} = repo.start_link([name: nil, pool_size: 2] ++ config)
     previous = repo.put_dynamic_repo(pid)
 
     try do
@@ -228,13 +231,13 @@ defmodule Mediate.Dev.Cluster do
   # Repo config lands in the application env before any repo starts. That
   # is the one place that can call `Application.put_env`: boot, not a test.
   defp configure_repos!(cluster, opts) do
-    Enum.each(opts[:repos], fn {repo, config} ->
-      pool = if config[:pool], do: [pool: config[:pool]], else: []
+    Enum.each(opts[:repos], fn {repo, repo_config} ->
+      pool = if repo_config[:pool], do: [pool: repo_config[:pool]], else: []
 
       Application.put_env(
         opts[:otp_app],
         repo,
-        connection(cluster, config[:role], config[:database]) ++ [pool_size: config[:pool_size]] ++ pool
+        config(cluster, repo_config[:role], repo_config[:database]) ++ [pool_size: repo_config[:pool_size]] ++ pool
       )
     end)
   end
@@ -265,7 +268,7 @@ defmodule Mediate.Dev.Cluster do
     end
   end
 
-  # Unnamed, so a schema dump can start its own cluster inside a test run.
+  # Unnamed, so a structure dump can start its own cluster inside a test run.
   defp start_repos!(opts) do
     children = Enum.map(opts[:repos], fn {repo, _config} -> repo end)
     {:ok, pid} = Supervisor.start_link(children, strategy: :one_for_one)

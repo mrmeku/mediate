@@ -1,119 +1,106 @@
 defmodule Mediate.Cerbos do
   @moduledoc """
-  The Cerbos adapter: the rules are policy files, and a sidecar on the same
-  host answers from them.
+  Cerbos: the engine whose rules are policy files a Cerbos server reads.
 
-  The configuration boots with `adapter: {Mediate.Cerbos, address: "127.0.0.1:3592"}`
-  (`Mediate.Config`). The entry carries the sidecar's `address:` and
-  nothing else, because the address is where the process runs. What the
-  adapter can read comes from the binding that `Mediate.Cerbos.Binding.bind/1`
-  makes at boot. The binding names the mediated repo, the declaration
-  module, the policy directory, and the commit of that directory.
+  The configuration boots with `engine: {Mediate.Cerbos, address: "127.0.0.1:3592"}`
+  (`Mediate.Config`). The entry carries the server's `address:` and
+  nothing else, because the address is where the process runs. The rest
+  comes from the binding `Mediate.Cerbos.Binding.bind/1` makes at boot:
+  the mediated repo, the declarations, the policy directory, and the
+  commit of that directory.
 
   Every call reads the declared attribute values through the bound repo,
-  then asks the sidecar once. `decide` asks for a decision over the row
-  the object names. Its answer names the policy the sidecar matched.
-  `scope` asks for a query plan and compiles the plan's filter into a
-  `dynamic` over the object type. A plan this adapter does not express
-  fails `scope` and emits `[:mediate, :cerbos, :scope_fallback]`. The port
-  then answers that scope as a denial.
+  then asks the server once. `authorize` asks for a decision over the row
+  the resource names, and the verdict names the policy the server
+  evaluated. `filter` asks for a plan over the resource type and compiles
+  it into a `dynamic`. A plan the compiler refuses fails `filter` with the
+  sentence that says why, and the library answers the call as a denial.
+  The filter limit is `:infinity`.
 
-  This adapter implements no `around_query/3`, because a sidecar carries no
-  session state a repo call runs under. The scope cap is `:none`.
-
-  The commit is the version identifier of every decision. `publish/0`
-  emits it as a policy version, because a deploy of the policy directory is
-  a version (`Mediate.Cerbos.Version`). What reaches the sidecar is what
-  the declarations name, so a policy cannot depend on a value no one
-  declared. The moment the request carries, and each request-time fact an
-  `environment` block declares, go as one principal attribute beside the
-  subject's own.
+  The engine has no `around_query/3`, because the server carries no
+  session state a repo call runs under. The commit is the policy version
+  of every verdict, and `release/0` publishes it, because a deploy of the
+  policy directory is a release (`Mediate.Cerbos.Version`). What reaches
+  the server is what the declarations name, so a policy cannot read a
+  value no one declared. The context facts go as one principal attribute
+  beside the subject's own (`Mediate.Cerbos.Declarations`).
   """
 
-  @behaviour Mediate.Adapter
+  @behaviour Mediate.Engine
 
   use Boundary,
     deps: [Mediate, Ecto, NimbleOptions],
     check: [apps: [:ecto_sql, :postgrex]],
-    exports: [
-      Attribute,
-      Attributes,
-      Binding,
-      Client,
-      Coverage,
-      Propagation,
-      Request,
-      Version
-    ]
+    exports: [Attribute, Binding, Client, Declarations, Facts, Request, Version]
 
   alias Mediate.Cerbos.Binding
   alias Mediate.Cerbos.Infrastructure.Decide
-  alias Mediate.Cerbos.Infrastructure.Version
+  alias Mediate.Cerbos.Infrastructure.Release
   alias Mediate.Error
-  alias Mediate.PolicyVersion
+  alias Mediate.PolicyRelease
 
   @schema NimbleOptions.new!(
             address: [
               type: :string,
               required: true,
-              doc: "The host and port the sidecar answers on, such as `127.0.0.1:3592`."
+              doc: "The host and port the server answers on, such as `127.0.0.1:3592`."
             ]
           )
 
-  @doc "Emits the bound directory's commit as a policy version. `Mediate.Cerbos.Version` says what it holds."
-  @spec publish() :: {:ok, PolicyVersion.t()} | {:error, Error.t()}
-  def publish, do: Version.publish(__MODULE__)
+  @doc "Builds the bound directory's release and publishes it. `Mediate.Cerbos.Version` says what the release holds."
+  @spec release() :: {:ok, PolicyRelease.t()} | {:error, Error.t()}
+  def release, do: Release.publish(__MODULE__)
 
-  @impl Mediate.Adapter
+  @impl Mediate.Engine
   def options_schema, do: @schema
 
-  @impl Mediate.Adapter
-  def scope_cap, do: :none
+  @impl Mediate.Engine
+  def filter_limit, do: :infinity
 
-  @impl Mediate.Adapter
-  def decide({_kind, _account} = subject, operation, {_type, _id} = object, %{now: _now} = environment, options)
-      when is_atom(operation) do
-    with {:ok, binding, address} <- bound(:decide, options) do
-      named(Decide.one(binding, address, subject, operation, object, environment), :decide)
+  @impl Mediate.Engine
+  def authorize({_kind, _account} = subject, action, {_type, _id} = resource, %{now: _now} = context, options)
+      when is_atom(action) do
+    with {:ok, binding, address} <- bound(:authorize, options) do
+      failed(Decide.one(binding, address, subject, action, resource, context), :authorize)
     end
   end
 
-  @impl Mediate.Adapter
-  def scope({_kind, _account} = subject, operation, object_type, %{now: _now} = environment, options)
-      when is_atom(operation) and is_atom(object_type) do
-    with {:ok, binding, address} <- bound(:scope, options) do
-      named(Decide.scoped(binding, address, subject, operation, object_type, environment), :scope)
+  @impl Mediate.Engine
+  def filter({_kind, _account} = subject, action, resource_type, %{now: _now} = context, options)
+      when is_atom(action) and is_atom(resource_type) do
+    with {:ok, binding, address} <- bound(:filter, options) do
+      failed(Decide.filter(binding, address, subject, action, resource_type, context), :filter)
     end
   end
 
-  defp named({:error, detail}, callback) when is_binary(detail) do
-    {:error, engine(callback, detail)}
+  defp failed({:error, text}, callback) when is_binary(text) do
+    {:error, %Error{reason: :engine_failed, message: "#{inspect(__MODULE__)} failed during #{callback}: #{text}"}}
   end
 
-  defp named(other, _callback), do: other
+  defp failed(other, _callback), do: other
 
-  defp bound(operation, options) do
-    with {:ok, address} <- address(operation, options),
-         {:ok, %Binding{} = binding} <- resolved(operation) do
+  defp bound(callback, options) do
+    with {:ok, address} <- address(callback, options),
+         {:ok, %Binding{} = binding} <- resolved(callback) do
       {:ok, binding, address}
     end
   end
 
-  defp resolved(operation) do
+  defp resolved(callback) do
     case Binding.resolve() do
       {:ok, %Binding{} = binding} -> {:ok, binding}
-      {:error, %Error{reason: :invalid, detail: detail}} -> {:error, engine(operation, detail)}
+      {:error, %Error{reason: :invalid, message: message}} -> failed({:error, message}, callback)
     end
   end
 
-  defp address(operation, options) do
+  defp address(callback, options) do
     case Keyword.fetch(options, :address) do
-      {:ok, address} when is_binary(address) -> {:ok, address}
-      _absent -> {:error, engine(operation, "the configuration entry names no address for the sidecar")}
-    end
-  end
+      {:ok, address} when is_binary(address) ->
+        {:ok, address}
 
-  defp engine(operation, detail) do
-    %Error{reason: :engine_unreachable, detail: "#{inspect(__MODULE__)} failed during #{operation}: #{detail}"}
+      _absent ->
+        entry = inspect({__MODULE__, options})
+        failed({:error, "invalid engine: #{entry} names no address; add address: \"host:port\""}, callback)
+    end
   end
 end

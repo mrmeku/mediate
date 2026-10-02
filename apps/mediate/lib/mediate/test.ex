@@ -1,13 +1,13 @@
 defmodule Mediate.Test do
   @moduledoc """
-  Helpers every test tier and a third party's adapter suite share:
+  Helpers every test in this repository and a third party's engine suite share:
 
   - the configuration override
   - the clock a test sets
-  - the settle of the configured adapter's own state
+  - the sync of the configured engine's own state
   - a poll with a deadline in place of a sleep
 
-  The core package ships them, so Tier 1 can run outside this repository.
+  The core package ships them, so the conformance cases can run outside this repository.
   """
 
   use Boundary,
@@ -15,9 +15,9 @@ defmodule Mediate.Test do
     deps: [Mediate, Ecto, NimbleOptions],
     exports: [Clock, Fake]
 
-  alias Mediate.Access
-  alias Mediate.Change
   alias Mediate.Config
+  alias Mediate.IdentityWrite
+  alias Mediate.ResourceRead
 
   @default_timeout 5_000
   @interval 10
@@ -49,21 +49,21 @@ defmodule Mediate.Test do
   end
 
   @doc """
-  Bring the configured adapter's own state into step with the tables and
-  answer `:ok`. An adapter that keeps no state of its own has nothing to
-  settle, and the answer is `:none`. So a shared scenario can settle after
-  it writes facts without an adapter's name. A settle that fails raises
-  what it failed with, because a scenario that cannot settle cannot ask
-  its question.
+  Bring the configured engine's own state into step with the tables and
+  answer `:ok`. An engine that keeps no state of its own has nothing to
+  sync, and the answer is `:stateless`. So a shared scenario can sync
+  after it writes facts without an engine's name. A sync that fails raises
+  what it failed with, because a scenario that cannot sync cannot ask its
+  question.
   """
-  @spec settle() :: :ok | :none
-  def settle do
+  @spec sync() :: :ok | :stateless
+  def sync do
     {:ok, config} = Config.resolve()
-    {adapter, _options} = Config.adapter(config)
+    {engine, _options} = Config.engine(config)
 
-    case settled(adapter) do
+    case synced(engine) do
       :ok -> :ok
-      :none -> :none
+      :stateless -> :stateless
       {:error, error} -> raise error
     end
   end
@@ -89,19 +89,19 @@ defmodule Mediate.Test do
   end
 
   @doc """
-  The change events the current process published while `fun` ran, in
-  order, with what `fun` returned. Only this process's changes count, so
-  async tests never see one another's.
+  The identity write events the current process published while `fun`
+  ran, in order, with what `fun` returned. Only this process's writes
+  count, so async tests never see one another's.
   """
-  @spec changes((-> term())) :: {term(), [map()]}
-  def changes(fun) when is_function(fun, 0), do: published(Change.event(), fun)
+  @spec writes((-> term())) :: {term(), [map()]}
+  def writes(fun) when is_function(fun, 0), do: published(IdentityWrite.event(), fun)
 
   @doc """
-  The access events the current process published while `fun` ran, in
-  order, with what `fun` returned. Only this process's reads count.
+  The resource read events the current process published while `fun` ran,
+  in order, with what `fun` returned. Only this process's reads count.
   """
-  @spec accesses((-> term())) :: {term(), [map()]}
-  def accesses(fun) when is_function(fun, 0), do: published(Access.event(), fun)
+  @spec reads((-> term())) :: {term(), [map()]}
+  def reads(fun) when is_function(fun, 0), do: published(ResourceRead.event(), fun)
 
   @doc """
   Calls `fun` until it returns a truthy value or `timeout` milliseconds pass.
@@ -144,11 +144,11 @@ defmodule Mediate.Test do
     end
   end
 
-  defp settled(adapter) do
-    if Code.ensure_loaded?(adapter) and function_exported?(adapter, :settle, 0) do
-      adapter.settle()
+  defp synced(engine) do
+    if Code.ensure_loaded?(engine) and function_exported?(engine, :sync, 0) do
+      engine.sync()
     else
-      :none
+      :stateless
     end
   end
 

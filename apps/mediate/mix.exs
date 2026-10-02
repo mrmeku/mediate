@@ -9,7 +9,7 @@ defmodule Mediate.MixProject do
       app: :mediate,
       version: @version,
       description:
-        "The authorization port an Elixir application calls, with the mediated Ecto repo, the events, and the adapter behaviour.",
+        "The four authorization calls an Elixir application makes, with the mediated Ecto repo, the events, and the engine behaviour.",
       package: package(),
       source_url: @source_url,
       build_path: "../../_build",
@@ -34,7 +34,7 @@ defmodule Mediate.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger, :crypto]]
   end
 
   # The coverage a run measures. A run with MEDIATE_DOMAIN_COVERAGE set
@@ -66,8 +66,8 @@ defmodule Mediate.MixProject do
     ]
   end
 
-  # `ecto_sql` is optional, because an application that takes the port
-  # without the seam needs `ecto` alone.
+  # `ecto_sql` is optional, because an application that calls the four
+  # functions without the mediated repo needs `ecto` alone.
   #
   # `postgrex` is the driver this package's own suite connects with, and
   # `stream_data` draws the population one property of that suite asks for.
@@ -99,7 +99,7 @@ defmodule Mediate.MixProject do
     ]
   end
 
-  # This package is the canonical home of the six documents the umbrella
+  # This package is the canonical home of the seven documents the umbrella
   # shares, so HexDocs holds one copy of each and every other package links
   # to it. ExDoc reads an extra relative to the working directory, `filename`
   # names the page, and `source` names the path the view-source link points
@@ -112,6 +112,7 @@ defmodule Mediate.MixProject do
       extras: [
         "README.md": [title: "Mediate core"],
         "../../docs/design.md": [title: "Design", filename: "design", source: "docs/design.md"],
+        "../../docs/naming.md": [title: "Naming", filename: "naming", source: "docs/naming.md"],
         "../../docs/controls.md": [
           title: "Controls",
           filename: "controls",

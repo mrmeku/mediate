@@ -1,20 +1,20 @@
 defmodule Example.Scenarios.Case do
   @moduledoc """
   The `scenario` macro: a `test` named by the scenario's id and sentence,
-  and tagged with them. The tags are the id, the rule the declaration says
-  it tests, and the controls the document cites for it. The table carries
-  the controls and the declaration does not, so a control id lives in one
-  place. The macro checks every declaration against
+  and tagged with them. The tags are the id, the clause the declaration
+  says it proves, and the controls the document cites for it. The table
+  carries the controls and the declaration does not, so a control id lives
+  in one place. The macro holds every declaration to
   `Example.Scenarios.Table` when the module compiles, so a scenario cannot
   drift from the table.
 
-  What a binding enforces each rule with is prose in that binding's README,
-  a table a person writes and keeps. Nothing here reads it, and a scenario
-  runs under every binding.
+  What a deployment enforces each clause with is prose in that deployment's
+  README, a table a person writes and keeps. Nothing here reads it, and a
+  scenario runs under every deployment.
 
       use Example.Scenarios.Case
 
-      scenario "enf-01", "A User with a Membership in a Repository's Project reads it", rule: :c1 do
+      scenario "enf-01", "An Account with a Membership in a Repository's Project reads it", clause: :c1 do
         ...
       end
   """
@@ -56,9 +56,9 @@ defmodule Example.Scenarios.Case do
   def __tags__(id, sentence, opts) when is_binary(id) and is_binary(sentence) and is_list(opts) do
     scenario = fetch!(id)
     check_sentence!(scenario, sentence)
-    rule = check_rule!(scenario, Keyword.fetch!(opts, :rule))
+    clause = check_clause!(scenario, Keyword.fetch!(opts, :clause))
 
-    [scenario: id, rule: rule, controls: scenario.controls]
+    [scenario: id, clause: clause, controls: scenario.controls]
   end
 
   defp fetch!(id) do
@@ -76,11 +76,11 @@ defmodule Example.Scenarios.Case do
     end
   end
 
-  defp check_rule!(%Row{id: id, tests: tests}, rule) do
-    if rule in tests do
-      rule
+  defp check_clause!(%Row{id: id, clauses: clauses}, clause) do
+    if clause in clauses do
+      clause
     else
-      raise ArgumentError, "scenario #{id} tests #{inspect(tests)}, got rule: #{inspect(rule)}"
+      raise ArgumentError, "scenario #{id} proves #{inspect(clauses)}, got clause: #{inspect(clause)}"
     end
   end
 end

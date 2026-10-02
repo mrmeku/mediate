@@ -1,61 +1,61 @@
 defmodule Mediate.Rbac.Infrastructure.Decide do
   @moduledoc false
-  # The answer `decide` gives: one query that selects every clause of the
-  # rule for the row asked about. The query runs through the bound repo as
-  # a library caller. The decider denies a row that is not there, and a subject no
-  # grant reaches, with `deny_by_default`. It denies a row that a grant
+  # The verdict `authorize` gives: one query that selects every rule of the
+  # plan for the row asked about. The query runs through the bound repo as
+  # the library. It denies a row that is not there, and a subject
+  # no grant reaches, with `no_rule_matched`. It denies a row that a grant
   # reaches but a predicate fails with `rule_denied` and that predicate's
-  # name. It allows a row every clause allows with the name of the first
+  # name. It allows a row every rule allows with the name of the first
   # grant that held. A predicate that answers with neither a `dynamic` nor
-  # a boolean is its detail, and the adapter names the callback it failed
-  # in.
+  # a boolean is the error's text, and the engine names the callback it
+  # failed in.
   #
-  # This module rescues nothing a repo raises. The port turns any exception
-  # a decider raises into a denial with `engine_unreachable`
-  # (`Mediate.Port`). So this package names no driver's error, and a
-  # driver it does not carry needs no clause of its own.
+  # This module rescues nothing a repo raises. The core turns any exception
+  # an engine raises into a denial with `engine_failed`. So this package
+  # names no driver's error, and a driver it does not carry needs no clause
+  # of its own.
 
   import Ecto.Query, only: [from: 2]
 
-  alias Mediate.Answer
   alias Mediate.Rbac.Binding
-  alias Mediate.Rbac.Infrastructure.Rule
+  alias Mediate.Rbac.Infrastructure.Plan
+  alias Mediate.Verdict
 
-  @doc "The answer for one object, with the clauses that held under `meta[:matched]`."
-  @spec one(Binding.t(), Mediate.subject(), atom(), Mediate.object(), Mediate.environment()) ::
-          {:ok, Answer.t()} | {:error, String.t()}
-  def one(%Binding{} = binding, {_kind, _account} = subject, operation, {type, id}, %{now: _now} = environment) do
-    case Rule.build(binding.policy, subject, operation, type, environment) do
-      {:ok, %Rule{} = rule} -> {:ok, answered(rule, row(binding.repo, rule, id))}
-      {:error, %Answer{} = answer} -> {:ok, matched(answer, [])}
-      {:error, detail} when is_binary(detail) -> {:error, detail}
+  @doc "The verdict for one resource, with the rules that held under `meta[:matched]`."
+  @spec one(Binding.t(), Mediate.subject(), atom(), Mediate.resource(), Mediate.context()) ::
+          {:ok, Verdict.t()} | {:error, String.t()}
+  def one(%Binding{} = binding, {_kind, _account} = subject, action, {type, id}, %{now: _now} = context) do
+    case Plan.build(binding.policy, subject, action, type, context) do
+      {:ok, %Plan{} = plan} -> {:ok, decided(plan, row(binding.repo, plan, id))}
+      {:error, %Verdict{} = verdict} -> {:ok, matched(verdict, [])}
+      {:error, text} when is_binary(text) -> {:error, text}
     end
   end
 
-  defp row(repo, %Rule{schema: schema} = rule, id) do
-    key = Rule.primary_key(schema)
-    query = from(row in schema, where: field(row, ^key) == ^id, select: ^Rule.clauses(rule))
-    repo.one(query, mediate: {:exempt, :library})
+  defp row(repo, %Plan{schema: schema} = plan, id) do
+    key = Plan.primary_key(schema)
+    query = from(row in schema, where: field(row, ^key) == ^id, select: ^Plan.rules(plan))
+    repo.one(query, authorized_by: {:exempt, :library})
   end
 
-  defp answered(%Rule{version: version}, nil), do: matched(Rule.deny(:deny_by_default, version), [])
+  defp decided(%Plan{policy_version: version}, nil), do: matched(Plan.deny(:no_rule_matched, version), [])
 
-  defp answered(%Rule{grants: grants, predicates: predicates, version: version}, row) do
+  defp decided(%Plan{grants: grants, predicates: predicates, policy_version: version}, row) do
     held = fn {name, _expression} -> row[name] == true end
-    held_names = for {name, _expression} = clause <- grants ++ predicates, held.(clause), do: name
-    answer = answer(Enum.find(grants, held), Enum.reject(predicates, held), version)
-    matched(answer, held_names)
+    held_names = for {name, _expression} = rule <- grants ++ predicates, held.(rule), do: Atom.to_string(name)
+    verdict = verdict(Enum.find(grants, held), Enum.reject(predicates, held), version)
+    matched(verdict, held_names)
   end
 
-  defp answer(nil, _failed, version), do: Rule.deny(:deny_by_default, version)
+  defp verdict(nil, _failed, version), do: Plan.deny(:no_rule_matched, version)
 
-  defp answer(_granted, [{name, _expression} | _rest], version) do
-    Rule.deny(:rule_denied, version, %{rule: Atom.to_string(name)})
+  defp verdict(_granted, [{name, _expression} | _rest], version) do
+    Plan.deny(:rule_denied, version, %{rule: Atom.to_string(name)})
   end
 
-  defp answer({name, _expression}, [], version) do
-    %Answer{verdict: :allow, reason: :allowed, version: version, meta: %{rule: Atom.to_string(name)}}
+  defp verdict({name, _expression}, [], version) do
+    %Verdict{effect: :allow, reason: :rule_allowed, policy_version: version, meta: %{rule: Atom.to_string(name)}}
   end
 
-  defp matched(%Answer{} = answer, names), do: %{answer | meta: Map.put(answer.meta, :matched, names)}
+  defp matched(%Verdict{} = verdict, names), do: %{verdict | meta: Map.put(verdict.meta, :matched, names)}
 end

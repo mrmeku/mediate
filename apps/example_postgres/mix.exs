@@ -23,10 +23,10 @@ defmodule ExamplePostgres.MixProject do
     ]
   end
 
-  # The dump task raises an ephemeral cluster, and the connection library
+  # The dump task starts a cluster of its own, and the connection library
   # under the cluster loads in the test environment alone.
   def cli do
-    [preferred_envs: [quality: :test, "mediate.schema_dump": :test]]
+    [preferred_envs: [quality: :test, "mediate.dump": :test]]
   end
 
   def application do
@@ -36,16 +36,16 @@ defmodule ExamplePostgres.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  # What the library's tasks read. The migrations of this repo produce the
-  # committed schema file, which carries the policies under this binding.
+  # What the library's tasks read. The migrations of this deployment produce
+  # the structure file, which carries the rules as the database prints them.
   defp mediate do
     [
-      schema_dump: [repo: Example.Infrastructure.OwnerRepo, output: "priv/schema/postgres.sql"]
+      dump: [repo: Example.Infrastructure.OwnerRepo, file: "priv/repo/structure.sql"]
     ]
   end
 
-  # The example, the adapter, and the connection library under the cluster
-  # the dump task raises. Every pin is exact. Versions verified against
+  # The example, the engine, and the connection library under the cluster
+  # the dump task starts. Every pin is exact. Versions verified against
   # https://hex.pm/api/packages/<name> on 2026-09-09.
   defp deps do
     [

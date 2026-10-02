@@ -1,86 +1,143 @@
 defmodule Mediate.Cerbos.Infrastructure.Decide do
-  # The answers the adapter gives: the attribute values it reads, one
-  # request to the sidecar, and the effects it answered turned into answers.
+  @moduledoc false
+  # The verdicts the engine gives: the attribute values it reads, one
+  # request to the server, and the effects it answered turned into verdicts.
   #
-  # A decision is one call that carries the object asked about. A scope is
-  # one call for the object type, and its filter becomes the rule. An effect
-  # of allow is an allowance by the policy the sidecar matched. Anything
-  # else is a denial that names the policy the sidecar evaluated, where it
-  # named one. A denial does not read as a rule that denied. The sidecar
-  # names the policy it evaluated whether a rule denied or no rule allowed,
-  # and the two are not the same claim.
+  # A decision is one call that carries the resource asked about. A filter
+  # is one call for the resource type, and its plan becomes the rule. An
+  # effect of allow is `:rule_allowed` by the policy the server evaluated.
+  # Anything else is `:no_rule_matched`, naming the policy the server
+  # evaluated where it named one. A denial does not read as a rule that
+  # denied. The server names the policy it evaluated whether a rule denied
+  # or no rule allowed, and the two are not the same claim.
   #
-  # A resource the sidecar answered nothing about gets a denial by default.
-  # A failure of the call answers the failure's detail, which the adapter
+  # A subject kind no block declares is `:subject_kind_unknown`, and a
+  # resource type no block declares is `:no_rule_matched` naming the type,
+  # before any query runs. A resource the server answered nothing about is
+  # a failure, not a verdict, because a missing answer is a fault. A
+  # failure of the call answers the failure's sentence, which the engine
   # turns into an engine error.
   #
-  # Each call carries the request-time facts with the subject's attributes.
-  # So a rule about the moment of the request reads the moment the port
-  # stamped it with, and not the sidecar's own clock.
-  @moduledoc false
+  # Each call carries the context facts with the subject's attributes. So a
+  # rule about the moment of the request reads the moment the library
+  # stamped it with, and not the server's own clock. Each verdict names the
+  # request id the body carried, which the server's audit log holds too.
 
   import Ecto.Query, only: [dynamic: 2]
 
-  alias Mediate.Answer
   alias Mediate.Cerbos.Binding
   alias Mediate.Cerbos.Client
-  alias Mediate.Cerbos.Infrastructure.Plan
+  alias Mediate.Cerbos.Declarations
+  alias Mediate.Cerbos.Domain.Plan
   alias Mediate.Cerbos.Infrastructure.Values
   alias Mediate.Cerbos.Request
+  alias Mediate.Engine
+  alias Mediate.Verdict
 
-  @fallback [:mediate, :cerbos, :scope_fallback]
+  @doc "The verdict for one resource, with the policy the server evaluated and the request id under `meta`."
+  @spec one(Binding.t(), Client.address(), Mediate.subject(), atom(), Mediate.resource(), Mediate.context()) ::
+          {:ok, Verdict.t()} | {:error, String.t()}
+  def one(%Binding{} = binding, address, {kind, _account} = subject, action, {type, _id} = resource, context)
+      when is_binary(address) and is_atom(action) do
+    case undeclared(binding, kind, type) do
+      nil ->
+        with {:ok, body} <- asked(binding, subject, action, type, resource, context),
+             {:ok, answered} <- Client.check_resources(address, body) do
+          answered(binding, body, answered, action, resource)
+        end
 
-  @doc "The telemetry event a plan this adapter cannot express emits, once per scope that falls back."
-  @spec fallback_event() :: [atom()]
-  def fallback_event, do: @fallback
-
-  @doc "The answer for one object, with the policy the sidecar matched under `meta[:matched]`."
-  @spec one(Binding.t(), Client.address(), Mediate.subject(), atom(), Mediate.object(), Mediate.environment()) ::
-          {:ok, Answer.t()} | {:error, String.t()}
-  def one(
-        %Binding{} = binding,
-        address,
-        {_kind, _account} = subject,
-        operation,
-        {type, _id} = object,
-        %{now: _now} = request
-      )
-      when is_binary(address) and is_atom(operation) do
-    with {:ok, body} <- asked(binding, subject, operation, type, object, request),
-         {:ok, answered} <- Client.check_resources(address, body) do
-      effect(binding, answered, operation, object)
+      %Verdict{} = verdict ->
+        {:ok, verdict}
     end
   end
 
   @doc """
-  The rule for an object type: the plan the sidecar answered, compiled
-  against the declarations. A plan that admits no row is a denial with the
-  rule `false`. A plan this adapter does not express emits
-  `fallback_event/0` and fails.
+  The rule for a resource type: the plan the server answered, compiled
+  against the declarations. A plan that admits no row is `:no_rule_matched`
+  with the rule `false`. A plan the compiler refuses fails with the
+  sentence that says why.
   """
-  @spec scoped(Binding.t(), Client.address(), Mediate.subject(), atom(), atom(), Mediate.environment()) ::
-          {:ok, Mediate.Adapter.scoped()} | {:error, String.t()}
-  def scoped(%Binding{} = binding, address, {_kind, _account} = subject, operation, kind, %{now: _now} = request)
-      when is_binary(address) and is_atom(operation) and is_atom(kind) do
-    with {:ok, principal} <- Values.principal(binding, subject, request),
-         body = Request.plan(subject, operation, kind, principal),
+  @spec filter(Binding.t(), Client.address(), Mediate.subject(), atom(), atom(), Mediate.context()) ::
+          {:ok, Engine.filtered()} | {:error, String.t()}
+  def filter(%Binding{} = binding, address, {kind, _account} = subject, action, type, context)
+      when is_binary(address) and is_atom(action) and is_atom(type) do
+    case undeclared(binding, kind, type) do
+      nil -> planned(binding, address, subject, action, type, context)
+      %Verdict{} = verdict -> {:ok, {dynamic([_row], false), verdict}}
+    end
+  end
+
+  defp planned(binding, address, subject, action, type, context) do
+    with {:ok, principal} <- Values.principal(binding, subject, context),
+         body = Request.plan(subject, action, type, principal),
          {:ok, answered} <- Client.plan_resources(address, body) do
-      compiled(binding, subject, request, operation, kind, answered)
+      compiled(binding, body, subject, action, type, context, Map.get(answered, "filter", %{}))
     end
   end
 
-  defp asked(binding, subject, operation, type, object, request) do
-    with {:ok, principal} <- Values.principal(binding, subject, request),
-         {:ok, by_id} <- Values.resources(binding, subject, type, [object], request) do
-      {:ok, Request.check(subject, operation, principal, [{object, values(by_id, object)}])}
+  defp undeclared(%Binding{declarations: declarations, commit: commit}, kind, type) do
+    cond do
+      not Declarations.names?(declarations, {:principal, kind}) ->
+        verdict(commit, :deny, :subject_kind_unknown, %{subject_kind: kind})
+
+      not Declarations.names?(declarations, {:resource, type}) ->
+        verdict(commit, :deny, :no_rule_matched, %{resource_type: type})
+
+      true ->
+        nil
     end
   end
 
-  defp effect(binding, answered, operation, object) do
-    with {:ok, effects} <- effects(answered, operation) do
-      {:ok, explanation(binding, Map.get(effects, key(object)))}
+  defp asked(binding, subject, action, type, resource, context) do
+    with {:ok, principal} <- Values.principal(binding, subject, context),
+         {:ok, by_id} <- Values.resources(binding, subject, type, [resource], context) do
+      {:ok, Request.check(subject, action, principal, [{resource, values(by_id, resource)}])}
     end
   end
+
+  defp answered(%Binding{commit: commit}, body, answered, action, {type, id} = resource) do
+    with {:ok, effects} <- effects(answered, action) do
+      case Map.get(effects, key(resource)) do
+        {"EFFECT_ALLOW", policy} ->
+          {:ok, verdict(commit, :allow, :rule_allowed, %{policy: policy, request_id: body.requestId})}
+
+        {_effect, policy} ->
+          {:ok, verdict(commit, :deny, :no_rule_matched, %{policy: policy, request_id: body.requestId})}
+
+        nil ->
+          {:error, "the Cerbos server answered nothing about #{type} #{id} in request #{body.requestId}"}
+      end
+    end
+  end
+
+  defp compiled(%Binding{commit: commit} = binding, body, subject, action, type, context, filter) do
+    meta = %{plan: shape(filter), request_id: body.requestId}
+
+    case Plan.compile(plan(binding, subject, action, type, context, filter)) do
+      {:ok, rule} -> {:ok, {rule, verdict(commit, :allow, :rule_allowed, meta)}}
+      :denied -> {:ok, {dynamic([_row], false), verdict(commit, :deny, :no_rule_matched, meta)}}
+      {:error, text} -> {:error, text}
+    end
+  end
+
+  defp plan(%Binding{declarations: declarations} = binding, subject, action, type, context, filter) do
+    {schema, key} = Binding.schema_and_key(binding, {:resource, type})
+
+    %Plan{
+      subject: subject,
+      action: action,
+      context: context,
+      plan: filter,
+      declarations: declarations,
+      type: type,
+      schema: schema,
+      key: key
+    }
+  end
+
+  defp shape(%{"kind" => "KIND_ALWAYS_ALLOWED"}), do: :always_allowed
+  defp shape(%{"kind" => "KIND_ALWAYS_DENIED"}), do: :always_denied
+  defp shape(_other), do: :conditional
 
   defp matched(result, action) do
     case result["meta"]["actions"][action]["matchedPolicy"] do
@@ -89,35 +146,14 @@ defmodule Mediate.Cerbos.Infrastructure.Decide do
     end
   end
 
-  defp answer("EFFECT_ALLOW", policy, version) do
-    %Answer{verdict: :allow, reason: :allowed, version: version, meta: %{rule: policy}}
-  end
-
-  defp answer(_effect, policy, version) do
-    %Answer{verdict: :deny, reason: :deny_by_default, version: version, meta: %{rule: policy}}
-  end
-
-  defp compiled(binding, subject, request, operation, kind, answered) do
-    case Plan.dynamic(binding, subject, request, kind, Map.get(answered, "filter", %{})) do
-      {:ok, rule} -> {:ok, {rule, allowed(binding, nil)}}
-      :denied -> {:ok, {dynamic([_row], false), denied(binding, nil)}}
-      {:error, detail} -> fallback(operation, kind, detail)
-    end
-  end
-
-  defp fallback(operation, kind, detail) do
-    :telemetry.execute(@fallback, %{}, %{operation: operation, kind: kind, detail: detail})
-    {:error, detail}
-  end
-
   # Keyed by kind and id, because that is how the answer names a resource.
-  defp effects(%{"results" => results}, operation) when is_list(results) do
-    action = Atom.to_string(operation)
-    {:ok, Map.new(results, &{resource_key(&1), {effect(&1, action), matched(&1, action)}})}
+  defp effects(%{"results" => results}, action) when is_list(results) do
+    name = Atom.to_string(action)
+    {:ok, Map.new(results, &{resource_key(&1), {effect(&1, name), matched(&1, name)}})}
   end
 
-  defp effects(other, _operation) do
-    {:error, "cerbos answered no results: " <> String.slice(inspect(other), 0, 200)}
+  defp effects(other, _action) do
+    {:error, "the Cerbos server answered no results: " <> String.slice(inspect(other), 0, 200)}
   end
 
   defp resource_key(result), do: {result["resource"]["kind"], result["resource"]["id"]}
@@ -128,13 +164,7 @@ defmodule Mediate.Cerbos.Infrastructure.Decide do
 
   defp key({type, id}), do: {Atom.to_string(type), to_string(id)}
 
-  defp explanation(binding, {"EFFECT_ALLOW", policy}), do: explaining(allowed(binding, policy), List.wrap(policy))
-  defp explanation(binding, {_effect, policy}), do: explaining(denied(binding, policy), [])
-  defp explanation(binding, nil), do: explaining(denied(binding, nil), [])
-
-  defp explaining(%Answer{} = answer, policies), do: %{answer | meta: Map.put(answer.meta, :matched, policies)}
-
-  defp allowed(%Binding{commit: commit}, policy), do: answer("EFFECT_ALLOW", policy, commit)
-
-  defp denied(%Binding{commit: commit}, policy), do: answer(nil, policy, commit)
+  defp verdict(commit, effect, reason, meta) do
+    %Verdict{effect: effect, reason: reason, policy_version: commit, meta: meta}
+  end
 end

@@ -13,8 +13,8 @@ defmodule Example.Domain.Team do
     belongs_to(:enterprise, Enterprise)
   end
 
-  object_type(:team)
-  carries([:enterprise])
-  audited(:entity)
-  fact(:enterprise_id, kind: :object_attribute, object: :id)
+  resource_type(:team)
+  covers([:enterprise])
+  identity(:group)
+  fact(:enterprise_id, about: :resource, resource: :id)
 end

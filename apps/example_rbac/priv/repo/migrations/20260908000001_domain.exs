@@ -1,4 +1,4 @@
-defmodule ExampleRbac.Repo.Migrations.Domain do
+defmodule ExampleRbac.Migrations.Domain do
   @moduledoc false
   use Ecto.Migration
 

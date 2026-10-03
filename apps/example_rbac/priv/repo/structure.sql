@@ -23,38 +23,20 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: account_roles; Type: TABLE; Schema: public; Owner: mediate_owner
+-- Name: accounts; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
-CREATE TABLE public.account_roles (
-    id bigint NOT NULL,
-    user_id text NOT NULL,
-    role text NOT NULL
+CREATE TABLE public.accounts (
+    id text NOT NULL,
+    name text NOT NULL,
+    kind text NOT NULL,
+    person_id text NOT NULL,
+    employment text NOT NULL,
+    country text NOT NULL
 );
 
 
-ALTER TABLE public.account_roles OWNER TO mediate_owner;
-
---
--- Name: account_roles_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.account_roles_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.account_roles_id_seq OWNER TO mediate_owner;
-
---
--- Name: account_roles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.account_roles_id_seq OWNED BY public.account_roles.id;
-
+ALTER TABLE public.accounts OWNER TO mediate_owner;
 
 --
 -- Name: directories; Type: TABLE; Schema: public; Owner: mediate_owner
@@ -147,7 +129,7 @@ ALTER TABLE public.labels OWNER TO mediate_owner;
 
 CREATE TABLE public.memberships (
     id bigint NOT NULL,
-    user_id text NOT NULL,
+    account_id text NOT NULL,
     project_id bigint NOT NULL,
     role text NOT NULL
 );
@@ -184,10 +166,10 @@ CREATE TABLE public.override_reports (
     id bigint NOT NULL,
     repository_id bigint NOT NULL,
     team_id bigint NOT NULL,
-    user_id text NOT NULL,
+    account_id text NOT NULL,
     justification text NOT NULL,
-    operation_id text NOT NULL,
-    at timestamp(0) without time zone NOT NULL
+    correlation_id text NOT NULL,
+    read_at timestamp(0) without time zone NOT NULL
 );
 
 
@@ -212,6 +194,40 @@ ALTER SEQUENCE public.override_reports_id_seq OWNER TO mediate_owner;
 --
 
 ALTER SEQUENCE public.override_reports_id_seq OWNED BY public.override_reports.id;
+
+
+--
+-- Name: permissions; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.permissions (
+    id bigint NOT NULL,
+    account_id text NOT NULL,
+    permission text NOT NULL
+);
+
+
+ALTER TABLE public.permissions OWNER TO mediate_owner;
+
+--
+-- Name: permissions_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.permissions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.permissions_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: permissions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.permissions_id_seq OWNED BY public.permissions.id;
 
 
 --
@@ -247,6 +263,46 @@ ALTER SEQUENCE public.projects_id_seq OWNER TO mediate_owner;
 --
 
 ALTER SEQUENCE public.projects_id_seq OWNED BY public.projects.id;
+
+
+--
+-- Name: proposals; Type: TABLE; Schema: public; Owner: mediate_owner
+--
+
+CREATE TABLE public.proposals (
+    id bigint NOT NULL,
+    repository_id bigint NOT NULL,
+    proposer_id text NOT NULL,
+    reviewer_id text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    labels text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
+    invited text[] DEFAULT ARRAY[]::text[] NOT NULL
+);
+
+
+ALTER TABLE public.proposals OWNER TO mediate_owner;
+
+--
+-- Name: proposals_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
+--
+
+CREATE SEQUENCE public.proposals_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.proposals_id_seq OWNER TO mediate_owner;
+
+--
+-- Name: proposals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
+--
+
+ALTER SEQUENCE public.proposals_id_seq OWNED BY public.proposals.id;
 
 
 --
@@ -303,7 +359,7 @@ ALTER TABLE public.schema_migrations OWNER TO mediate_owner;
 
 CREATE TABLE public.team_roles (
     id bigint NOT NULL,
-    user_id text NOT NULL,
+    account_id text NOT NULL,
     team_id bigint NOT NULL,
     role text NOT NULL
 );
@@ -367,22 +423,6 @@ ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
 
 
 --
--- Name: users; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.users (
-    id text NOT NULL,
-    name text NOT NULL,
-    kind text NOT NULL,
-    person_id text NOT NULL,
-    employment text NOT NULL,
-    country text NOT NULL
-);
-
-
-ALTER TABLE public.users OWNER TO mediate_owner;
-
---
 -- Name: visibilities; Type: TABLE; Schema: public; Owner: mediate_owner
 --
 
@@ -420,53 +460,6 @@ ALTER SEQUENCE public.visibilities_id_seq OWNED BY public.visibilities.id;
 
 
 --
--- Name: visibility_proposals; Type: TABLE; Schema: public; Owner: mediate_owner
---
-
-CREATE TABLE public.visibility_proposals (
-    id bigint NOT NULL,
-    repository_id bigint NOT NULL,
-    proposer_id text NOT NULL,
-    reviewer_id text,
-    status text DEFAULT 'pending'::text NOT NULL,
-    labels text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    restrictions text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    releasable_to text[] DEFAULT ARRAY[]::text[] NOT NULL,
-    invited text[] DEFAULT ARRAY[]::text[] NOT NULL
-);
-
-
-ALTER TABLE public.visibility_proposals OWNER TO mediate_owner;
-
---
--- Name: visibility_proposals_id_seq; Type: SEQUENCE; Schema: public; Owner: mediate_owner
---
-
-CREATE SEQUENCE public.visibility_proposals_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.visibility_proposals_id_seq OWNER TO mediate_owner;
-
---
--- Name: visibility_proposals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: mediate_owner
---
-
-ALTER SEQUENCE public.visibility_proposals_id_seq OWNED BY public.visibility_proposals.id;
-
-
---
--- Name: account_roles id; Type: DEFAULT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.account_roles ALTER COLUMN id SET DEFAULT nextval('public.account_roles_id_seq'::regclass);
-
-
---
 -- Name: directories id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
@@ -495,10 +488,24 @@ ALTER TABLE ONLY public.override_reports ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: permissions id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.permissions ALTER COLUMN id SET DEFAULT nextval('public.permissions_id_seq'::regclass);
+
+
+--
 -- Name: projects id; Type: DEFAULT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.projects ALTER COLUMN id SET DEFAULT nextval('public.projects_id_seq'::regclass);
+
+
+--
+-- Name: proposals id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.proposals ALTER COLUMN id SET DEFAULT nextval('public.proposals_id_seq'::regclass);
 
 
 --
@@ -530,18 +537,11 @@ ALTER TABLE ONLY public.visibilities ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
--- Name: visibility_proposals id; Type: DEFAULT; Schema: public; Owner: mediate_owner
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.visibility_proposals ALTER COLUMN id SET DEFAULT nextval('public.visibility_proposals_id_seq'::regclass);
-
-
---
--- Name: account_roles account_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.account_roles
-    ADD CONSTRAINT account_roles_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
 
 
 --
@@ -585,11 +585,27 @@ ALTER TABLE ONLY public.override_reports
 
 
 --
+-- Name: permissions permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.permissions
+    ADD CONSTRAINT permissions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.projects
     ADD CONSTRAINT projects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proposals proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.proposals
+    ADD CONSTRAINT proposals_pkey PRIMARY KEY (id);
 
 
 --
@@ -625,14 +641,6 @@ ALTER TABLE ONLY public.teams
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
 -- Name: visibilities visibilities_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
@@ -641,32 +649,24 @@ ALTER TABLE ONLY public.visibilities
 
 
 --
--- Name: visibility_proposals visibility_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: memberships_account_id_project_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.visibility_proposals
-    ADD CONSTRAINT visibility_proposals_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_roles_user_id_role_index; Type: INDEX; Schema: public; Owner: mediate_owner
---
-
-CREATE UNIQUE INDEX account_roles_user_id_role_index ON public.account_roles USING btree (user_id, role);
+CREATE UNIQUE INDEX memberships_account_id_project_id_index ON public.memberships USING btree (account_id, project_id);
 
 
 --
--- Name: memberships_user_id_project_id_index; Type: INDEX; Schema: public; Owner: mediate_owner
+-- Name: permissions_account_id_permission_index; Type: INDEX; Schema: public; Owner: mediate_owner
 --
 
-CREATE UNIQUE INDEX memberships_user_id_project_id_index ON public.memberships USING btree (user_id, project_id);
+CREATE UNIQUE INDEX permissions_account_id_permission_index ON public.permissions USING btree (account_id, permission);
 
 
 --
--- Name: team_roles_user_id_team_id_role_index; Type: INDEX; Schema: public; Owner: mediate_owner
+-- Name: team_roles_account_id_team_id_role_index; Type: INDEX; Schema: public; Owner: mediate_owner
 --
 
-CREATE UNIQUE INDEX team_roles_user_id_team_id_role_index ON public.team_roles USING btree (user_id, team_id, role);
+CREATE UNIQUE INDEX team_roles_account_id_team_id_role_index ON public.team_roles USING btree (account_id, team_id, role);
 
 
 --
@@ -674,14 +674,6 @@ CREATE UNIQUE INDEX team_roles_user_id_team_id_role_index ON public.team_roles U
 --
 
 CREATE UNIQUE INDEX visibilities_repository_id_index ON public.visibilities USING btree (repository_id);
-
-
---
--- Name: account_roles account_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.account_roles
-    ADD CONSTRAINT account_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -693,6 +685,14 @@ ALTER TABLE ONLY public.directories
 
 
 --
+-- Name: memberships memberships_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.memberships
+    ADD CONSTRAINT memberships_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
 -- Name: memberships memberships_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
@@ -701,11 +701,11 @@ ALTER TABLE ONLY public.memberships
 
 
 --
--- Name: memberships memberships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: override_reports override_reports_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.memberships
-    ADD CONSTRAINT memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.override_reports
+    ADD CONSTRAINT override_reports_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
 
 
 --
@@ -725,11 +725,11 @@ ALTER TABLE ONLY public.override_reports
 
 
 --
--- Name: override_reports override_reports_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: permissions permissions_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.override_reports
-    ADD CONSTRAINT override_reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.permissions
+    ADD CONSTRAINT permissions_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
 
 
 --
@@ -738,6 +738,30 @@ ALTER TABLE ONLY public.override_reports
 
 ALTER TABLE ONLY public.projects
     ADD CONSTRAINT projects_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
+
+
+--
+-- Name: proposals proposals_proposer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.proposals
+    ADD CONSTRAINT proposals_proposer_id_fkey FOREIGN KEY (proposer_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: proposals proposals_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.proposals
+    ADD CONSTRAINT proposals_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
+
+
+--
+-- Name: proposals proposals_reviewer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.proposals
+    ADD CONSTRAINT proposals_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.accounts(id);
 
 
 --
@@ -757,19 +781,19 @@ ALTER TABLE ONLY public.repositories
 
 
 --
+-- Name: team_roles team_roles_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+--
+
+ALTER TABLE ONLY public.team_roles
+    ADD CONSTRAINT team_roles_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
 -- Name: team_roles team_roles_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
 --
 
 ALTER TABLE ONLY public.team_roles
     ADD CONSTRAINT team_roles_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
-
-
---
--- Name: team_roles team_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.team_roles
-    ADD CONSTRAINT team_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -789,41 +813,10 @@ ALTER TABLE ONLY public.visibilities
 
 
 --
--- Name: visibility_proposals visibility_proposals_proposer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
+-- Name: TABLE accounts; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
-ALTER TABLE ONLY public.visibility_proposals
-    ADD CONSTRAINT visibility_proposals_proposer_id_fkey FOREIGN KEY (proposer_id) REFERENCES public.users(id);
-
-
---
--- Name: visibility_proposals visibility_proposals_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.visibility_proposals
-    ADD CONSTRAINT visibility_proposals_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id);
-
-
---
--- Name: visibility_proposals visibility_proposals_reviewer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: mediate_owner
---
-
-ALTER TABLE ONLY public.visibility_proposals
-    ADD CONSTRAINT visibility_proposals_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id);
-
-
---
--- Name: TABLE account_roles; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.account_roles TO mediate_app;
-
-
---
--- Name: SEQUENCE account_roles_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.account_roles_id_seq TO mediate_app;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.accounts TO mediate_app;
 
 
 --
@@ -890,6 +883,20 @@ GRANT SELECT,USAGE ON SEQUENCE public.override_reports_id_seq TO mediate_app;
 
 
 --
+-- Name: TABLE permissions; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.permissions TO mediate_app;
+
+
+--
+-- Name: SEQUENCE permissions_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.permissions_id_seq TO mediate_app;
+
+
+--
 -- Name: TABLE projects; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
@@ -901,6 +908,20 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.projects TO mediate_app;
 --
 
 GRANT SELECT,USAGE ON SEQUENCE public.projects_id_seq TO mediate_app;
+
+
+--
+-- Name: TABLE proposals; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.proposals TO mediate_app;
+
+
+--
+-- Name: SEQUENCE proposals_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
+--
+
+GRANT SELECT,USAGE ON SEQUENCE public.proposals_id_seq TO mediate_app;
 
 
 --
@@ -946,13 +967,6 @@ GRANT SELECT,USAGE ON SEQUENCE public.teams_id_seq TO mediate_app;
 
 
 --
--- Name: TABLE users; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.users TO mediate_app;
-
-
---
 -- Name: TABLE visibilities; Type: ACL; Schema: public; Owner: mediate_owner
 --
 
@@ -964,20 +978,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.visibilities TO mediate_app;
 --
 
 GRANT SELECT,USAGE ON SEQUENCE public.visibilities_id_seq TO mediate_app;
-
-
---
--- Name: TABLE visibility_proposals; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE public.visibility_proposals TO mediate_app;
-
-
---
--- Name: SEQUENCE visibility_proposals_id_seq; Type: ACL; Schema: public; Owner: mediate_owner
---
-
-GRANT SELECT,USAGE ON SEQUENCE public.visibility_proposals_id_seq TO mediate_app;
 
 
 --
